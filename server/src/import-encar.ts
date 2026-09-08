@@ -1,6 +1,6 @@
 import { importFromEncar } from "./services/importer.js";
 
-const limit = Number(process.argv[2] || 700);
+const limit = Number(process.argv[2] || 1200);
 console.log(`Importing up to ${limit} cars from Encar…`);
 importFromEncar(limit)
   .then((r) => {

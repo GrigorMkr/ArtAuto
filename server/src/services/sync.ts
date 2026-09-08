@@ -5,7 +5,7 @@ let running = false;
 export async function syncAllCatalog(opts?: { encar?: number; dongchedi?: number }) {
   if (running) return { skipped: true, reason: "sync already running" };
   running = true;
-  const encarLimit = opts?.encar ?? 700;
+  const encarLimit = opts?.encar ?? 1200;
   const dcdLimit = opts?.dongchedi ?? 500;
   try {
     console.log(`[sync] start Encar=${encarLimit} Dongchedi=${dcdLimit}`);
@@ -30,10 +30,11 @@ export function startDailySync() {
   const boot = async () => {
     const { loadStore } = await import("../db.js");
     const total = loadStore().vehicles.filter((v) => v.source === "encar" || v.source === "dongchedi").length;
+    const korea = loadStore().vehicles.filter((v) => v.country === "KR").length;
     const china = loadStore().vehicles.filter((v) => v.country === "CN").length;
-    if (total < 1000 || china < 450) {
-      console.log(`[sync] catalog has ${total} live cars (CN=${china}) — filling`);
-      await syncAllCatalog({ encar: 700, dongchedi: 500 });
+    if (total < 1500 || china < 450 || korea < 1000) {
+      console.log(`[sync] catalog has ${total} live cars (KR=${korea} CN=${china}) — filling`);
+      await syncAllCatalog({ encar: 1200, dongchedi: 500 });
     }
   };
 
@@ -41,7 +42,7 @@ export function startDailySync() {
 
   const DAY_MS = 24 * 60 * 60 * 1000;
   setInterval(() => {
-    syncAllCatalog({ encar: 700, dongchedi: 500 }).catch((e) => console.error("[sync] daily failed", e));
+    syncAllCatalog({ encar: 1200, dongchedi: 500 }).catch((e) => console.error("[sync] daily failed", e));
   }, DAY_MS);
 
   console.log("[sync] daily updater scheduled (every 24h)");

@@ -227,7 +227,7 @@ export function AdminPage() {
                 run("Полный sync", () =>
                   adminFetch("/import/sync", {
                     method: "POST",
-                    body: JSON.stringify({ encar: 700, dongchedi: 500 }),
+                    body: JSON.stringify({ encar: 1200, dongchedi: 500 }),
                   })
                 )
               }
@@ -240,7 +240,7 @@ export function AdminPage() {
               disabled={!!busy}
               onClick={() =>
                 run("Корея", () =>
-                  adminFetch("/import/encar", { method: "POST", body: JSON.stringify({ limit: 500 }) })
+                  adminFetch("/import/encar", { method: "POST", body: JSON.stringify({ limit: 1200 }) })
                 )
               }
             >

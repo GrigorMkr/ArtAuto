@@ -52,21 +52,6 @@ export function VehiclePage() {
       <Reveal delay={0.08}>
         <article className="detail">
           <div className="detail-media">
-            {vehicle.source_url ? (
-              <a
-                className="detail-source"
-                href={vehicle.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Открыть оригинал объявления
-                {vehicle.source === "encar"
-                  ? " на Encar"
-                  : vehicle.source === "dongchedi"
-                    ? " на Dongchedi"
-                    : ""}
-              </a>
-            ) : null}
             {main ? (
               <CarPhoto
                 className="detail-hero"
@@ -149,6 +134,20 @@ export function VehiclePage() {
               </Link>
             )}
             {dealMsg && <p className="ok">{dealMsg}</p>}
+            {vehicle.source_url ? (
+              <a
+                className="detail-source"
+                href={vehicle.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {vehicle.source === "encar"
+                  ? "Открыть оригинал объявления на Encar"
+                  : vehicle.source === "dongchedi"
+                    ? "Открыть оригинал объявления на Dongchedi"
+                    : "Открыть оригинал объявления"}
+              </a>
+            ) : null}
             {vehicle.foreign_price != null && (
               <p className="muted">
                 Цена авто: {new Intl.NumberFormat("ru-RU").format(vehicle.foreign_price)}{" "}

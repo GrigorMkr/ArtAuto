@@ -44,8 +44,11 @@ export const artautoApi = createApi({
       query: (slug) => `/vehicles/${encodeURIComponent(slug)}`,
       providesTags: (_r, _e, slug) => [{ type: "Vehicle", id: slug }],
     }),
-    getMeta: builder.query<MetaResponse, void>({
-      query: () => "/meta",
+    getMeta: builder.query<MetaResponse, { country?: string } | void>({
+      query: (arg) => ({
+        url: "/meta",
+        params: arg && "country" in arg && arg.country ? { country: arg.country } : {},
+      }),
       providesTags: ["Meta"],
       keepUnusedDataFor: 600,
     }),

@@ -56,7 +56,7 @@ function serialize(v: Vehicle, opts?: { allImages?: boolean; light?: boolean }) 
 
 let rankedCache: { key: number; rows: Vehicle[] } | null = null;
 
-/** Korea: local marques only. China: all CN-market lots (Dongchedi), drop junk brands. */
+/** Keep KR/CN market lots; drop empty/junk brand labels only. */
 function isKoreaChinaBrand(v: Vehicle) {
   if (v.country !== "CN" && v.country !== "KR") return false;
   const b = v.brand
@@ -64,33 +64,7 @@ function isKoreaChinaBrand(v: Vehicle) {
     .normalize("NFKD")
     .replace(/[^a-z0-9а-яёㄱ-ㅎㅏ-ㅣ가-힣]+/gi, "");
   if (!b || b === "unknown") return false;
-
-  // Chinese market listings — keep volume; filter only empty/garbage names
-  if (v.country === "CN") {
-    if (b.length < 2) return false;
-    return true;
-  }
-
-  const korea = [
-    "hyundai",
-    "kia",
-    "genesis",
-    "ssangyong",
-    "kgmobility",
-    "renaultkorea",
-    "renaultsamsung",
-    "samsung",
-    "daewoo",
-    "기아",
-    "현대",
-    "제네시스",
-    "쌍용",
-  ];
-
-  return korea.some((k) => {
-    const key = k.toLowerCase().replace(/[^a-z0-9а-яёㄱ-ㅎㅏ-ㅣ가-힣]+/gi, "");
-    return key.length > 1 && b.includes(key);
-  });
+  return b.length >= 2;
 }
 
 function rankedVehicles() {
@@ -181,8 +155,12 @@ api.get("/vehicles/:slug", (req, res) => {
   res.json(serialize(row, { allImages: true }));
 });
 
-api.get("/meta", (_req, res) => {
-  const rows = rankedVehicles();
+api.get("/meta", (req, res) => {
+  const country = String(req.query.country || "");
+  let rows = rankedVehicles();
+  if (country === "KR" || country === "CN") {
+    rows = rows.filter((v) => v.country === country);
+  }
   const brands = [...new Set(rows.map((v) => v.brand).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, "en")
   );
@@ -361,9 +339,9 @@ api.patch("/admin/deals/:id", requireAdmin, adminPatchDeal);
 
 api.post("/import/encar", requireAdmin, async (req, res) => {
   try {
-    const limit = Number(req.body?.limit || req.query.limit || 700);
+    const limit = Number(req.body?.limit || req.query.limit || 1200);
     const { importFromEncar } = await import("./services/importer.js");
-    const result = await importFromEncar(Math.min(Math.max(limit, 20), 1000));
+    const result = await importFromEncar(Math.min(Math.max(limit, 20), 1500));
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: String(e) });
@@ -395,7 +373,7 @@ api.post("/import/dongchedi", requireAdmin, async (req, res) => {
 api.post("/import/sync", requireAdmin, async (req, res) => {
   try {
     const { syncAllCatalog } = await import("./services/sync.js");
-    const encar = Number(req.body?.encar || 700);
+    const encar = Number(req.body?.encar || 1200);
     const dongchedi = Number(req.body?.dongchedi || 500);
     const result = await syncAllCatalog({ encar, dongchedi });
     res.json(result);

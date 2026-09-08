@@ -976,7 +976,7 @@ html.is-brand-loading {
 }
 .detail-source {
   display: inline-flex;
-  margin: 0 0 0.75rem;
+  margin: 0.75rem 0 0.35rem;
   font-size: 0.9rem;
   font-weight: 700;
   color: var(--signal-deep);

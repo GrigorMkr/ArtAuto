@@ -252,30 +252,20 @@ export async function imageProxy(req: Request, res: Response) {
   res.status(404).end();
 }
 
-function chinaScrubFrames(raw: string) {
-  const encoded = encodeURIComponent(raw);
-  const base = `https://wsrv.nl/?url=${encoded}&output=jpg&w=900&q=80`;
-  // Different crops/foci so card hover scrub works like Korea even with 1 source photo
-  return [
-    base,
-    `${base}&a=attention`,
-    `${base}&crop=16:10&a=north`,
-    `${base}&crop=16:10&a=center`,
-    `${base}&crop=16:10&a=south`,
-  ];
-}
-
 /**
  * China: give browser a public mirror URL directly (Dongchedi CDN often blocked from RU).
- * If only one photo — expand to scrub frames (like Korea multi-shot cards).
+ * Only real distinct photos — never fake crop duplicates.
  * Korea/other: go through our /api/img proxy + disk cache.
  */
 export function proxiedImages(urls: string[]) {
   const list = (urls || []).filter(Boolean).map((u) => String(u));
   if (!list.length) return [];
 
-  // Already wsrv scrub frames from import — pass through
+  // Already proxied via wsrv — pass through unique frames
   if (list[0].includes("wsrv.nl/")) {
+    const unique = [...new Set(list.map((u) => u.split("&a=")[0].split("&crop=")[0]))];
+    // If these are only crop variants of one image, keep first only
+    if (unique.length === 1 && list.length > 1) return [list[0]];
     return list.slice(0, 12);
   }
 
@@ -284,13 +274,15 @@ export function proxiedImages(urls: string[]) {
     const host = new URL(first).hostname;
     if (isChinaHost(host)) {
       const cleaned = list.map((u) => normalizeChinaImageUrl(u) || u).filter(Boolean);
-      const unique = [...new Set(cleaned)];
-      if (unique.length >= 2) {
-        return unique.slice(0, 12).map(
-          (u) => `https://wsrv.nl/?url=${encodeURIComponent(u)}&output=jpg&w=900&q=80`
-        );
+      const byHash = new Map<string, string>();
+      for (const u of cleaned) {
+        const m = u.match(/tos-cn-i-f042mdwyw7\/([a-f0-9]{32})/i);
+        const key = m ? m[1].toLowerCase() : u;
+        if (!byHash.has(key)) byHash.set(key, u);
       }
-      return chinaScrubFrames(unique[0] || first);
+      return [...byHash.values()]
+        .slice(0, 12)
+        .map((u) => `https://wsrv.nl/?url=${encodeURIComponent(u)}&output=jpg&w=900&q=80`);
     }
   } catch {
     /* fall through */

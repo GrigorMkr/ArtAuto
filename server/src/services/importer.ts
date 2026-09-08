@@ -113,7 +113,7 @@ function applyBatch(source: string, offers: NormalizedImport[]) {
   return { created, updated, ...stats(store) };
 }
 
-export async function importFromEncar(limit = 120) {
+export async function importFromEncar(limit = 1200) {
   const { seed } = await import("../seed.js");
   seed();
   console.log(`[import] Encar fetch up to ${limit}…`);

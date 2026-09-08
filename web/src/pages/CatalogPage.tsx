@@ -50,7 +50,9 @@ export function CatalogPage() {
   );
 
   const { data, isFetching, isLoading, isSuccess } = useGetCatalogQuery(queryArgs);
-  const { data: meta } = useGetMetaQuery();
+  const { data: meta } = useGetMetaQuery(
+    filters.country ? { country: filters.country } : undefined
+  );
 
   useEffect(() => {
     setOffset(0);
