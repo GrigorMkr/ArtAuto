@@ -64,9 +64,15 @@ Vite проксирует `/api` на backend.
 
 ## GitHub Pages
 
-Фронтенд деплоится в GitHub Pages: https://grigormkr.github.io/ArtAuto/
+Фронтенд: https://grigormkr.github.io/ArtAuto/
 
-Каталог на Pages работает **без API** — данные берутся из `web/public/data/catalog.json` (обновление: `cd server && npm run export:static`).
+После первого успешного workflow один раз включи Pages:
+
+1. https://github.com/GrigorMkr/ArtAuto/settings/pages  
+2. **Source** → **Deploy from a branch**  
+3. Branch: `gh-pages` / `/ (root)` → Save  
+
+Каталог на Pages работает **без API** — данные из `web/public/data/catalog.json` (обновление: `cd server && npm run export:static`).
 
 Калькулятор / кабинет / заявки на Pages без backend недоступны — для них локально запускайте `server` + `web`.
 
