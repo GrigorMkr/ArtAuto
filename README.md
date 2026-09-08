@@ -66,4 +66,8 @@ Vite проксирует `/api` на backend.
 
 Фронтенд деплоится в GitHub Pages: https://grigormkr.github.io/ArtAuto/
 
-Каталог и калькулятор на Pages работают только если API доступен отдельно (локально `server/` на `:4000` или свой хостинг). Для полного сайта запускайте `server` + `web` локально.
+Каталог на Pages работает **без API** — данные берутся из `web/public/data/catalog.json` (обновление: `cd server && npm run export:static`).
+
+Калькулятор / кабинет / заявки на Pages без backend недоступны — для них локально запускайте `server` + `web`.
+
+Локально фронт ходит напрямую на API `http://127.0.0.1:4000` (не через Vite proxy).

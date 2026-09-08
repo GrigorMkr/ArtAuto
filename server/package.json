@@ -10,7 +10,8 @@
     "seed": "tsx src/seed-cli.ts",
     "import:encar": "tsx src/import-encar.ts",
     "import:china": "tsx src/import-china.ts",
-    "import:sync": "tsx src/import-sync.ts"
+    "import:sync": "tsx src/import-sync.ts",
+    "export:static": "tsx src/export-static.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
