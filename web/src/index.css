@@ -10,41 +10,10 @@
   --silver: #d7dee7;
   --font: "Manrope Local", "DM Sans", system-ui, sans-serif;
   --display: "Loos Wide", "Syne", system-ui, sans-serif;
-  --hero: url("/brand/artauto-hero.jpg?v=2");
+  /* --hero / --brand-logo / @font-face set in main.tsx with Vite BASE_URL */
+  --hero: none;
+  --brand-logo: none;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@font-face {
-  font-family: "Loos Wide";
-  src: url("/fonts/loos-wide-medium.woff2") format("woff2"),
-       url("/fonts/loos-wide-medium.woff") format("woff");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Loos Wide";
-  src: url("/fonts/loos-normal-medium.woff2") format("woff2"),
-       url("/fonts/loos-normal-medium.woff") format("woff");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Manrope Local";
-  src: url("/fonts/manrope-medium.woff2") format("woff2"),
-       url("/fonts/manrope-medium.woff") format("woff");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Manrope Local";
-  src: url("/fonts/manrope-600-cyrillic.woff2") format("woff2"),
-       url("/fonts/manrope-600-latin.woff2") format("woff2");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
 }
 
 * { box-sizing: border-box; border: 0; }
@@ -156,8 +125,8 @@ html.is-brand-loading {
   );
   background-size: 220% 100%;
   mix-blend-mode: soft-light;
-  -webkit-mask-image: url("/brand/artauto-logo.png?v=8");
-  mask-image: url("/brand/artauto-logo.png?v=8");
+  -webkit-mask-image: var(--brand-logo);
+  mask-image: var(--brand-logo);
   -webkit-mask-size: contain;
   mask-size: contain;
   -webkit-mask-repeat: no-repeat;
@@ -534,8 +503,8 @@ html.is-brand-loading {
   );
   background-size: 220% 100%;
   mix-blend-mode: soft-light;
-  -webkit-mask-image: url("/brand/artauto-logo.png?v=8");
-  mask-image: url("/brand/artauto-logo.png?v=8");
+  -webkit-mask-image: var(--brand-logo);
+  mask-image: var(--brand-logo);
   -webkit-mask-size: contain;
   mask-size: contain;
   -webkit-mask-repeat: no-repeat;

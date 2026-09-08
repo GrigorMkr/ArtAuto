@@ -31,28 +31,69 @@ export async function runCalculator(payload: Record<string, unknown>) {
   return data;
 }
 
+function assetUrl(path: string) {
+  const base = import.meta.env.BASE_URL || "/";
+  const clean = path.replace(/^\//, "");
+  return `${base}${clean}`;
+}
+
+function viaWsrv(url: string) {
+  return `https://wsrv.nl/?url=${encodeURIComponent(url)}&output=jpg&w=900&q=80`;
+}
+
+/** Decode legacy `/api/img?u=` / `/api/img/:b64` (no Express on GitHub Pages). */
+function unwrapImgProxy(src: string): string | null {
+  if (src.startsWith("/api/img?")) {
+    try {
+      return new URL(src, "https://local.invalid").searchParams.get("u");
+    } catch {
+      return null;
+    }
+  }
+  if (src.startsWith("/api/img/")) {
+    try {
+      const b64 = src.slice("/api/img/".length).split(/[?#]/)[0];
+      return decodeURIComponent(atob(b64));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function needsPublicMirror(host: string) {
+  return (
+    host.includes("encar") ||
+    host.includes("byteimg") ||
+    host.includes("dcd") ||
+    host.includes("dcar") ||
+    host.includes("toutiao") ||
+    host.includes("dongchedi")
+  );
+}
+
+/**
+ * Resolve image URLs for both local API and static GitHub Pages.
+ * Encar/China CDNs go through wsrv.nl (Pages has no `/api/img` proxy).
+ */
 export function mediaUrl(src?: string | null) {
   if (!src) return "";
-  if (src.startsWith("/api/img?") || src.startsWith("/api/img/")) return src;
-  if (src.startsWith("/brand/")) return src;
+  const unwrapped = unwrapImgProxy(src);
+  if (unwrapped) src = unwrapped;
+
+  if (src.startsWith("/brand/") || src.startsWith("brand/")) return assetUrl(src);
   if (src.startsWith("https://wsrv.nl/") || src.startsWith("https://images.weserv.nl/")) return src;
   if (src.startsWith("/") && !src.startsWith("//")) return src;
-  // China CDN: load via public mirror in the browser (keep full signed URL)
+
   try {
     const host = new URL(src).hostname.toLowerCase();
-    if (
-      host.includes("byteimg") ||
-      host.includes("dcd") ||
-      host.includes("dcar") ||
-      host.includes("toutiao") ||
-      host.includes("dongchedi")
-    ) {
-      return `https://wsrv.nl/?url=${encodeURIComponent(src)}&output=jpg&w=900&q=80`;
-    }
+    if (needsPublicMirror(host)) return viaWsrv(src);
   } catch {
     /* fall through */
   }
-  return `/api/img?u=${encodeURIComponent(src)}`;
+
+  if (/^https?:\/\//i.test(src)) return viaWsrv(src);
+  return src;
 }
 
 export function formatRub(value: number | null | undefined) {

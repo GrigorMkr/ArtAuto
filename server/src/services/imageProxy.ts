@@ -253,13 +253,15 @@ export async function imageProxy(req: Request, res: Response) {
 }
 
 /**
- * China: give browser a public mirror URL directly (Dongchedi CDN often blocked from RU).
- * Only real distinct photos — never fake crop duplicates.
- * Korea/other: go through our /api/img proxy + disk cache.
+ * Public CDNs (China + Encar): browser loads via wsrv.nl mirror.
+ * Works on GitHub Pages without Express `/api/img`. Only real distinct photos.
  */
 export function proxiedImages(urls: string[]) {
   const list = (urls || []).filter(Boolean).map((u) => String(u));
   if (!list.length) return [];
+
+  const toWsrv = (u: string) =>
+    `https://wsrv.nl/?url=${encodeURIComponent(u)}&output=jpg&w=900&q=80`;
 
   // Already proxied via wsrv — pass through unique frames
   if (list[0].includes("wsrv.nl/")) {
@@ -280,13 +282,15 @@ export function proxiedImages(urls: string[]) {
         const key = m ? m[1].toLowerCase() : u;
         if (!byHash.has(key)) byHash.set(key, u);
       }
-      return [...byHash.values()]
-        .slice(0, 12)
-        .map((u) => `https://wsrv.nl/?url=${encodeURIComponent(u)}&output=jpg&w=900&q=80`);
+      return [...byHash.values()].slice(0, 12).map(toWsrv);
+    }
+    if (host.includes("encar")) {
+      return [...new Set(list)].slice(0, 12).map(toWsrv);
     }
   } catch {
     /* fall through */
   }
 
-  return list.map((u) => `/api/img?u=${encodeURIComponent(u)}`);
+  // Fallback still uses wsrv so static hosting never depends on /api/img
+  return list.slice(0, 12).map(toWsrv);
 }

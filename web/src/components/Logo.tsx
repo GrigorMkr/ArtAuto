@@ -16,7 +16,11 @@ export function Logo({ className, compact, markOnly, tone = "dark" }: Props) {
         "logo--dark": tone === "dark",
       })}
     >
-      <img className="logo-mark" src="/brand/artauto-logo.png?v=8" alt="АртАвто" />
+      <img
+        className="logo-mark"
+        src={`${import.meta.env.BASE_URL}brand/artauto-logo.png?v=8`}
+        alt="АртАвто"
+      />
       {!markOnly && (
         <span className="logo-text">
           <strong>АртАвто</strong>
