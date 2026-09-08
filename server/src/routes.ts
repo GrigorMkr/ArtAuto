@@ -18,6 +18,7 @@ import {
   adminStats,
   adminWarmImages,
 } from "./services/admin.js";
+import { dedupeVisualVehicles } from "./services/dedupeVehicles.js";
 
 export const api = Router();
 
@@ -71,15 +72,17 @@ function rankedVehicles() {
   const store = loadStore();
   const key = store.vehicles.length + store.seq.vehicle;
   if (rankedCache && rankedCache.key === key) return rankedCache.rows;
-  const rows = store.vehicles
-    .filter((v) => v.status === "AVAILABLE" && isKoreaChinaBrand(v))
-    .sort((a, b) => {
-      const score = (v: Vehicle) =>
-        (v.source === "encar" ? 4 : 0) +
-        (v.images?.length ? 2 : 0) +
-        (String(v.images?.[0] || "").includes("encar.com") ? 2 : 0);
-      return score(b) - score(a) || b.id - a.id;
-    });
+  const rows = dedupeVisualVehicles(
+    store.vehicles
+      .filter((v) => v.status === "AVAILABLE" && isKoreaChinaBrand(v))
+      .sort((a, b) => {
+        const score = (v: Vehicle) =>
+          (v.source === "encar" ? 4 : 0) +
+          (v.images?.length ? 2 : 0) +
+          (String(v.images?.[0] || "").includes("encar.com") ? 2 : 0);
+        return score(b) - score(a) || b.id - a.id;
+      })
+  );
   rankedCache = { key, rows };
   return rows;
 }

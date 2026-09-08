@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { loadStore, type Vehicle } from "./db.js";
 import { latinizeVehicle, stripCjk } from "./services/latinNames.js";
 import { proxiedImages } from "./services/imageProxy.js";
+import { dedupeVisualVehicles } from "./services/dedupeVehicles.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outPath = path.join(__dirname, "..", "..", "web", "public", "data", "catalog.json");
@@ -55,14 +56,15 @@ function slim(v: Vehicle) {
 }
 
 const store = loadStore();
-const vehicles = store.vehicles
-  .filter(isOkBrand)
-  .sort((a, b) => {
-    const score = (v: Vehicle) =>
-      (v.source === "encar" ? 4 : 0) + (v.images?.length ? 2 : 0);
-    return score(b) - score(a) || b.id - a.id;
-  })
-  .map(slim);
+const vehicles = dedupeVisualVehicles(
+  store.vehicles
+    .filter(isOkBrand)
+    .sort((a, b) => {
+      const score = (v: Vehicle) =>
+        (v.source === "encar" ? 4 : 0) + (v.images?.length ? 2 : 0);
+      return score(b) - score(a) || b.id - a.id;
+    })
+).map(slim);
 
 const brands = [...new Set(vehicles.map((v) => v.brand).filter(Boolean))].sort((a, b) =>
   a.localeCompare(b, "en")
