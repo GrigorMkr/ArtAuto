@@ -57,6 +57,8 @@ export type CalcResult = {
   breakdown: Record<string, number>;
   total_rub: number;
   rates?: Record<string, number>;
+  age_band?: string;
+  recycling_note?: string;
 };
 
 export type MetaResponse = {

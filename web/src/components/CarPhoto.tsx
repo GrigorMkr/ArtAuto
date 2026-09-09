@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import classNames from "classnames";
 import { mediaUrl } from "../api";
 
@@ -19,7 +19,7 @@ function chinaFallbacks(src?: string) {
   return [...new Set(list.filter(Boolean))];
 }
 
-export function CarPhoto({ src, alt, className, eager }: Props) {
+export const CarPhoto = memo(function CarPhoto({ src, alt, className, eager }: Props) {
   const [idx, setIdx] = useState(0);
   const candidates = chinaFallbacks(src);
   const url = candidates[idx] || "";
@@ -47,4 +47,4 @@ export function CarPhoto({ src, alt, className, eager }: Props) {
       onError={() => setIdx((v) => v + 1)}
     />
   );
-}
+});

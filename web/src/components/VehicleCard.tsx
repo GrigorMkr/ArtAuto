@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { memo, useEffect, useMemo, useState, type MouseEvent } from "react";
 import type { Vehicle } from "../types";
 import { countryLabel, formatRub, mediaUrl } from "../api";
 import classNames from "classnames";
@@ -8,11 +8,10 @@ function formatForeignPrice(price: number, currency: string) {
   return `${new Intl.NumberFormat("ru-RU").format(price)} ${currency}`;
 }
 
-export function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
+function VehicleCardInner({ vehicle }: { vehicle: Vehicle }) {
   const photos = useMemo(() => {
     const raw = (vehicle.images || []).filter(Boolean).slice(0, 8);
     const mapped = raw.map((src) => mediaUrl(src)).filter(Boolean);
-    // Drop near-duplicate scrub crops of the same cover
     const unique = mapped.filter((src, i, arr) => {
       const base = src.split("&a=")[0].split("&crop=")[0];
       return arr.findIndex((x) => x.split("&a=")[0].split("&crop=")[0] === base) === i;
@@ -96,3 +95,22 @@ export function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
     </Link>
   );
 }
+
+export const VehicleCard = memo(VehicleCardInner, (prev, next) => {
+  const a = prev.vehicle;
+  const b = next.vehicle;
+  return (
+    a.public_slug === b.public_slug &&
+    a.estimated_total_rub === b.estimated_total_rub &&
+    a.foreign_price === b.foreign_price &&
+    a.brand === b.brand &&
+    a.model === b.model &&
+    a.year === b.year &&
+    a.mileage_km === b.mileage_km &&
+    a.fuel_type === b.fuel_type &&
+    a.transmission === b.transmission &&
+    a.country === b.country &&
+    (a.images?.length || 0) === (b.images?.length || 0) &&
+    a.images?.[0] === b.images?.[0]
+  );
+});

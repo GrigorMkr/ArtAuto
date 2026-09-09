@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { FormEvent } from "react";
 import { useCreateLeadMutation } from "../store/apiSlice";
 
@@ -8,7 +8,11 @@ type Props = {
   title?: string;
 };
 
-export function LeadForm({ vehicleSlug, calculationSnapshot, title = "Хочу купить" }: Props) {
+export const LeadForm = memo(function LeadForm({
+  vehicleSlug,
+  calculationSnapshot,
+  title = "Хочу купить",
+}: Props) {
   const [createLead, { isLoading }] = useCreateLeadMutation();
   const [ok, setOk] = useState(false);
   const [error, setError] = useState("");
@@ -70,4 +74,4 @@ export function LeadForm({ vehicleSlug, calculationSnapshot, title = "Хочу �
       </form>
     </div>
   );
-}
+});

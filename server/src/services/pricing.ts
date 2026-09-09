@@ -1,30 +1,90 @@
 export type PricingInput = {
   vehicle_rub: number;
   foreign_expenses_rub: number;
+  transfer_fee_rub?: number;
+  port_delivery_rub?: number;
+  freight_rub?: number;
+  /** @deprecated use freight_rub */
+  transport_to_vladivostok_rub?: number;
+  customs_fee_rub?: number;
+  customs_duty_rub?: number;
+  /** @deprecated use customs_fee + customs_duty */
+  customs_total_rub?: number;
+  excise_rub?: number;
+  vat_rub?: number;
+  recycling_fee_rub: number;
   broker_rub: number;
-  transport_to_vladivostok_rub: number;
+  laboratory_rub?: number;
   company_fee_rub: number;
   delivery_russia_rub: number;
-  customs_total_rub: number;
-  recycling_fee_rub: number;
-  laboratory_rub?: number;
   extra_rub?: number;
 };
 
+export type PricingBreakdown = {
+  vehicle_rub: number;
+  foreign_expenses_rub: number;
+  transfer_fee_rub: number;
+  port_delivery_rub: number;
+  freight_rub: number;
+  customs_fee_rub: number;
+  customs_duty_rub: number;
+  excise_rub: number;
+  vat_rub: number;
+  recycling_fee_rub: number;
+  broker_rub: number;
+  laboratory_rub: number;
+  company_fee_rub: number;
+  delivery_russia_rub: number;
+  extra_rub: number;
+  /** legacy alias kept for old UI */
+  transport_to_vladivostok_rub: number;
+  customs_total_rub: number;
+};
+
 export function calculateTotal(p: PricingInput) {
-  const breakdown = {
+  const freight = round(p.freight_rub ?? p.transport_to_vladivostok_rub ?? 0);
+  const customsFee = round(p.customs_fee_rub ?? 0);
+  const customsDuty = round(
+    p.customs_duty_rub ?? Math.max(0, (p.customs_total_rub ?? 0) - customsFee)
+  );
+
+  const breakdown: PricingBreakdown = {
     vehicle_rub: round(p.vehicle_rub),
     foreign_expenses_rub: round(p.foreign_expenses_rub),
+    transfer_fee_rub: round(p.transfer_fee_rub ?? 0),
+    port_delivery_rub: round(p.port_delivery_rub ?? 0),
+    freight_rub: freight,
+    customs_fee_rub: customsFee,
+    customs_duty_rub: customsDuty,
+    excise_rub: round(p.excise_rub ?? 0),
+    vat_rub: round(p.vat_rub ?? 0),
+    recycling_fee_rub: round(p.recycling_fee_rub),
     broker_rub: round(p.broker_rub),
-    transport_to_vladivostok_rub: round(p.transport_to_vladivostok_rub),
+    laboratory_rub: round(p.laboratory_rub ?? 0),
     company_fee_rub: round(p.company_fee_rub),
     delivery_russia_rub: round(p.delivery_russia_rub),
-    customs_total_rub: round(p.customs_total_rub),
-    recycling_fee_rub: round(p.recycling_fee_rub),
-    laboratory_rub: round(p.laboratory_rub ?? 0),
     extra_rub: round(p.extra_rub ?? 0),
+    transport_to_vladivostok_rub: freight,
+    customs_total_rub: customsFee + customsDuty,
   };
-  const total_rub = Object.values(breakdown).reduce((a, b) => a + b, 0);
+
+  const total_rub =
+    breakdown.vehicle_rub +
+    breakdown.foreign_expenses_rub +
+    breakdown.transfer_fee_rub +
+    breakdown.port_delivery_rub +
+    breakdown.freight_rub +
+    breakdown.customs_fee_rub +
+    breakdown.customs_duty_rub +
+    breakdown.excise_rub +
+    breakdown.vat_rub +
+    breakdown.recycling_fee_rub +
+    breakdown.broker_rub +
+    breakdown.laboratory_rub +
+    breakdown.company_fee_rub +
+    breakdown.delivery_russia_rub +
+    breakdown.extra_rub;
+
   return { breakdown, total_rub };
 }
 
@@ -36,14 +96,61 @@ export function round(n: number) {
   return Math.round(n);
 }
 
-export const DEFAULT_SETTINGS: Record<string, { value: number; currency: string }> = {
-  CN_FOREIGN_EXPENSES_CNY: { value: 16000, currency: "CNY" },
-  CN_BROKER_RUB: { value: 70000, currency: "RUB" },
-  CN_TO_VLADIVOSTOK_RUB: { value: 15000, currency: "RUB" },
-  CN_COMPANY_FEE_RUB: { value: 70000, currency: "RUB" },
-  KR_FOREIGN_EXPENSES_KRW: { value: 500000, currency: "KRW" },
-  KR_BROKER_RUB: { value: 100000, currency: "RUB" },
-  KR_TO_VLADIVOSTOK_RUB: { value: 70000, currency: "RUB" },
-  KR_COMPANY_FEE_RUB: { value: 70000, currency: "RUB" },
-  DELIVERY_VLADIVOSTOK_UFA_RUB: { value: 190000, currency: "RUB" },
+export const DEFAULT_SETTINGS: Record<string, { value: number; currency: string; description: string }> = {
+  CN_FOREIGN_EXPENSES_CNY: { value: 16000, currency: "CNY", description: "Расходы в Китае" },
+  CN_TRANSFER_FEE_RUB: { value: 25000, currency: "RUB", description: "Комиссия за перевод (CN)" },
+  CN_PORT_DELIVERY_RUB: { value: 15000, currency: "RUB", description: "Доставка до порта (CN)" },
+  CN_FREIGHT_RUB: { value: 15000, currency: "RUB", description: "Фрахт / до Владивостока (CN)" },
+  CN_BROKER_RUB: { value: 70000, currency: "RUB", description: "Брокер (CN)" },
+  CN_LABORATORY_RUB: { value: 45000, currency: "RUB", description: "СБКТС / ЭПТС / лаборатория (CN)" },
+  CN_COMPANY_FEE_RUB: { value: 70000, currency: "RUB", description: "Услуги АртАвто (CN)" },
+  KR_FOREIGN_EXPENSES_KRW: { value: 500000, currency: "KRW", description: "Расходы в Корее" },
+  KR_TRANSFER_FEE_RUB: { value: 35000, currency: "RUB", description: "Комиссия за перевод (KR)" },
+  KR_PORT_DELIVERY_RUB: { value: 40000, currency: "RUB", description: "Доставка до порта (KR)" },
+  KR_FREIGHT_RUB: { value: 70000, currency: "RUB", description: "Фрахт / до Владивостока (KR)" },
+  KR_BROKER_RUB: { value: 100000, currency: "RUB", description: "Брокер (KR)" },
+  KR_LABORATORY_RUB: { value: 45000, currency: "RUB", description: "СБКТС / ЭПТС / лаборатория (KR)" },
+  KR_COMPANY_FEE_RUB: { value: 70000, currency: "RUB", description: "Услуги АртАвто (KR)" },
+  DELIVERY_VLADIVOSTOK_UFA_RUB: { value: 190000, currency: "RUB", description: "Доставка по РФ до Уфы" },
+  // legacy aliases (kept for old store rows)
+  CN_TO_VLADIVOSTOK_RUB: { value: 15000, currency: "RUB", description: "legacy → CN_FREIGHT_RUB" },
+  KR_TO_VLADIVOSTOK_RUB: { value: 70000, currency: "RUB", description: "legacy → KR_FREIGHT_RUB" },
+};
+
+/** Display order for UI breakdown (Silver-like). */
+export const BREAKDOWN_ORDER = [
+  "vehicle_rub",
+  "foreign_expenses_rub",
+  "transfer_fee_rub",
+  "port_delivery_rub",
+  "freight_rub",
+  "customs_fee_rub",
+  "customs_duty_rub",
+  "excise_rub",
+  "vat_rub",
+  "recycling_fee_rub",
+  "broker_rub",
+  "laboratory_rub",
+  "company_fee_rub",
+  "delivery_russia_rub",
+] as const;
+
+export const BREAKDOWN_LABELS: Record<string, string> = {
+  vehicle_rub: "Цена автомобиля",
+  foreign_expenses_rub: "Расходы в стране",
+  transfer_fee_rub: "Комиссия за перевод денег",
+  port_delivery_rub: "Доставка до порта",
+  freight_rub: "Фрахт / морская доставка",
+  transport_to_vladivostok_rub: "Фрахт / морская доставка",
+  customs_fee_rub: "Таможенный сбор",
+  customs_duty_rub: "Таможенная пошлина (единый платёж)",
+  customs_total_rub: "Таможенные платежи",
+  excise_rub: "Акциз",
+  vat_rub: "НДС",
+  recycling_fee_rub: "Утилизационный сбор",
+  broker_rub: "Брокерские услуги",
+  laboratory_rub: "СБКТС / ЭПТС / лаборатория",
+  company_fee_rub: "Услуги АртАвто",
+  delivery_russia_rub: "Доставка по России",
+  extra_rub: "Дополнительно",
 };

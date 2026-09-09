@@ -31,7 +31,7 @@ export type Vehicle = {
   foreign_price: number | null;
   foreign_currency: string;
   estimated_total_rub: number | null;
-  specifications: Record<string, number>;
+  specifications: Record<string, number | string>;
   images: string[];
 };
 

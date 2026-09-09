@@ -5,12 +5,14 @@ import { migrate, loadStore } from "./db.js";
 import { seed } from "./seed.js";
 import { api } from "./routes.js";
 import { startDailySync } from "./services/sync.js";
+import { startFxRefresh } from "./services/fxRates.js";
 
 migrate();
 const seeded = seed();
 console.log(`Settings ready, vehicles=${seeded.vehicles}, purgedMocks=${seeded.purged}, admin=${seeded.admin}`);
 
 startDailySync();
+startFxRefresh();
 
 const app = express();
 app.use(cors());

@@ -312,17 +312,24 @@ api.post("/calculator", (req, res) => {
     const adjusted = calculateTotal({
       vehicle_rub: result.breakdown.vehicle_rub,
       foreign_expenses_rub: result.breakdown.foreign_expenses_rub,
+      transfer_fee_rub: result.breakdown.transfer_fee_rub,
+      port_delivery_rub: result.breakdown.port_delivery_rub,
+      freight_rub: result.breakdown.freight_rub,
+      customs_fee_rub: result.breakdown.customs_fee_rub,
+      customs_duty_rub: result.breakdown.customs_duty_rub,
+      excise_rub: result.breakdown.excise_rub,
+      vat_rub: result.breakdown.vat_rub,
+      recycling_fee_rub: result.breakdown.recycling_fee_rub,
       broker_rub: result.breakdown.broker_rub,
-      transport_to_vladivostok_rub: result.breakdown.transport_to_vladivostok_rub,
+      laboratory_rub: result.breakdown.laboratory_rub,
       company_fee_rub: result.breakdown.company_fee_rub,
       delivery_russia_rub: d.delivery_city_rub,
-      customs_total_rub: result.breakdown.customs_total_rub,
-      recycling_fee_rub: result.breakdown.recycling_fee_rub,
-      laboratory_rub: result.breakdown.laboratory_rub,
       extra_rub: result.breakdown.extra_rub,
     });
     return res.json({
       ...adjusted,
+      age_band: result.age_band,
+      recycling_note: result.recycling_note,
       rates: { CNY: commercialRate("CNY"), KRW: commercialRate("KRW"), EUR: commercialRate("EUR") },
       settings: {
         broker: setting(d.country === "CN" ? "CN_BROKER_RUB" : "KR_BROKER_RUB"),
@@ -357,6 +364,90 @@ api.post("/admin/images/warm", requireAdmin, adminWarmImages);
 api.get("/admin/leads", requireAdmin, adminListLeads);
 api.get("/admin/deals", requireAdmin, adminListDeals);
 api.patch("/admin/deals/:id", requireAdmin, adminPatchDeal);
+
+api.get("/admin/settings", requireAdmin, (_req, res) => {
+  const store = loadStore();
+  res.json({
+    settings: store.price_settings,
+    defaults: Object.fromEntries(
+      Object.entries(DEFAULT_SETTINGS).map(([k, v]) => [k, v])
+    ),
+  });
+});
+
+api.patch("/admin/settings", requireAdmin, (req, res) => {
+  const items = Array.isArray(req.body?.settings) ? req.body.settings : [];
+  const store = loadStore();
+  for (const row of items) {
+    const key = String(row.key || "");
+    if (!key) continue;
+    const existing = store.price_settings.find((s) => s.key === key);
+    const value = Number(row.value);
+    if (!Number.isFinite(value)) continue;
+    if (existing) existing.value = value;
+    else {
+      const meta = DEFAULT_SETTINGS[key];
+      store.price_settings.push({
+        key,
+        value,
+        currency: meta?.currency || "RUB",
+        description: meta?.description || key,
+      });
+    }
+  }
+  saveStore(store);
+  res.json({ ok: true, settings: store.price_settings });
+});
+
+api.get("/admin/fx", requireAdmin, (_req, res) => {
+  res.json({ items: loadStore().fx_rates });
+});
+
+api.patch("/admin/fx", requireAdmin, (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  const store = loadStore();
+  for (const row of items) {
+    const code = String(row.code || "").toUpperCase();
+    const fx = store.fx_rates.find((r) => r.code === code);
+    if (!fx) continue;
+    if (row.official_rate_rub != null && Number.isFinite(Number(row.official_rate_rub))) {
+      fx.official_rate_rub = Number(row.official_rate_rub);
+    }
+    if (row.commercial_markup_pct != null && Number.isFinite(Number(row.commercial_markup_pct))) {
+      fx.commercial_markup_pct = Number(row.commercial_markup_pct);
+    }
+    if (row.manual_commercial_rate_rub === null || row.manual_commercial_rate_rub === "") {
+      fx.manual_commercial_rate_rub = null;
+    } else if (
+      row.manual_commercial_rate_rub != null &&
+      Number.isFinite(Number(row.manual_commercial_rate_rub))
+    ) {
+      fx.manual_commercial_rate_rub = Number(row.manual_commercial_rate_rub);
+    }
+  }
+  saveStore(store);
+  res.json({ ok: true, items: store.fx_rates });
+});
+
+api.post("/admin/fx/refresh", requireAdmin, async (_req, res) => {
+  try {
+    const { refreshOfficialFxRates } = await import("./services/fxRates.js");
+    const result = await refreshOfficialFxRates();
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+api.post("/admin/reprice", requireAdmin, async (_req, res) => {
+  try {
+    const { repriceAllVehicles } = await import("./services/reprice.js");
+    const result = repriceAllVehicles();
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
 
 api.post("/import/encar", requireAdmin, async (req, res) => {
   try {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent, type TouchEvent } from "react";
+import { memo, useEffect, useRef, useState, type MouseEvent, type TouchEvent } from "react";
 import { createPortal } from "react-dom";
 import classNames from "classnames";
 import { CarPhoto } from "./CarPhoto";
@@ -11,7 +11,7 @@ type Props = {
   onChange: (index: number) => void;
 };
 
-export function DetailGallery({ photos, alt, active, onChange }: Props) {
+export const DetailGallery = memo(function DetailGallery({ photos, alt, active, onChange }: Props) {
   const [lightbox, setLightbox] = useState(false);
   const touchX = useRef<number | null>(null);
   const scrubbing = useRef(false);
@@ -209,4 +209,4 @@ export function DetailGallery({ photos, alt, active, onChange }: Props) {
       {lightboxNode}
     </div>
   );
-}
+});

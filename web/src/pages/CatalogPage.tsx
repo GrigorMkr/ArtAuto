@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import type { FormEvent } from "react";
 import { Helmet } from "react-helmet-async";
-import { Link, useSearchParams } from "react-router-dom";
-import classNames from "classnames";
+import { useSearchParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { artautoApi, useGetCatalogQuery, useGetMetaQuery } from "../store/apiSlice";
-import { VehicleCard } from "../components/VehicleCard";
 import { Reveal } from "../components/Motion";
+import { CatalogCountryTabs } from "../components/catalog/CatalogCountryTabs";
+import { CatalogFiltersForm } from "../components/catalog/CatalogFiltersForm";
+import { CatalogGrid } from "../components/catalog/CatalogGrid";
 import type { AppDispatch } from "../store/store";
 import type { CatalogFilters, Vehicle } from "../types";
 
@@ -15,7 +16,6 @@ const PAGE_SIZE = 24;
 export function CatalogPage() {
   const dispatch = useDispatch<AppDispatch>();
   const [params, setParams] = useSearchParams();
-  const [more, setMore] = useState(false);
   const [items, setItems] = useState<Vehicle[]>([]);
   const [offset, setOffset] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -96,38 +96,62 @@ export function CatalogPage() {
     }
   }, [data, isFetching, filters, dispatch]);
 
-  const list = Array.isArray(items) ? items : [];
+  const list = items;
   const total = data?.total ?? list.length;
   const canMore = list.length < total;
   const busy = isLoading || loadingMore || (isFetching && offset > 0);
 
-  const models = (meta?.models || [])
-    .filter((m) => !filters.brand || m.brand === filters.brand)
-    .map((m) => m.model);
+  const onSubmit = useCallback(
+    (e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      const fd = new FormData(e.currentTarget);
+      const next = new URLSearchParams();
+      for (const [k, v] of fd.entries()) {
+        const val = String(v).trim();
+        if (val) next.set(k, val);
+      }
+      startTransition(() => setParams(next));
+    },
+    [setParams]
+  );
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const next = new URLSearchParams();
-    for (const [k, v] of fd.entries()) {
-      const val = String(v).trim();
-      if (val) next.set(k, val);
-    }
-    setParams(next);
-  }
+  const setCountry = useCallback(
+    (country: string) => {
+      const next = new URLSearchParams(params);
+      if (!country) next.delete("country");
+      else next.set("country", country);
+      startTransition(() => setParams(next));
+    },
+    [params, setParams]
+  );
 
-  function setCountry(country: string) {
-    const next = new URLSearchParams(params);
-    if (!country) next.delete("country");
-    else next.set("country", country);
-    setParams(next);
-  }
+  const onBrandChange = useCallback(
+    (brand: string) => {
+      const next = new URLSearchParams(params);
+      if (!brand) next.delete("brand");
+      else next.set("brand", brand);
+      next.delete("model");
+      startTransition(() => setParams(next));
+    },
+    [params, setParams]
+  );
 
-  function loadMore() {
+  const onModelChange = useCallback(
+    (model: string) => {
+      const next = new URLSearchParams(params);
+      if (!model) next.delete("model");
+      else next.set("model", model);
+      if (filters.brand) next.set("brand", filters.brand);
+      startTransition(() => setParams(next));
+    },
+    [params, setParams, filters.brand]
+  );
+
+  const loadMore = useCallback(() => {
     if (busy || !canMore) return;
     setLoadingMore(true);
     setOffset((o) => o + PAGE_SIZE);
-  }
+  }, [busy, canMore]);
 
   return (
     <>
@@ -136,166 +160,33 @@ export function CatalogPage() {
       </Helmet>
 
       <div className="catalog-stage">
-      <Reveal>
-        <section className="page-intro">
-          <p className="eyebrow">Каталог</p>
-          <h1>Автомобили из Кореи и Китая</h1>
-          <p className="lede">Цена на карточке уже включает расчёт под ключ до Уфы.</p>
-        </section>
-      </Reveal>
+        <Reveal>
+          <section className="page-intro">
+            <p className="eyebrow">Каталог</p>
+            <h1>Автомобили из Кореи и Китая</h1>
+            <p className="lede">Цена на карточке уже включает расчёт под ключ до Уфы.</p>
+          </section>
+        </Reveal>
 
-      <div className="country-tabs">
-        {[
-          { id: "", label: "Все авто" },
-          { id: "CN", label: "Китай" },
-          { id: "KR", label: "Корея" },
-        ].map((t) => (
-          <button
-            key={t.id || "all"}
-            type="button"
-            className={classNames({ active: (filters.country || "") === t.id })}
-            onClick={() => setCountry(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+        <CatalogCountryTabs country={filters.country} onChange={setCountry} />
 
-      <form className="filters" onSubmit={onSubmit} key={filterKey}>
-        <label>
-          Марка
-          <select
-            name="brand"
-            defaultValue={filters.brand || ""}
-            onChange={(e) => {
-              const next = new URLSearchParams(params);
-              const brand = e.target.value;
-              if (!brand) next.delete("brand");
-              else next.set("brand", brand);
-              next.delete("model");
-              setParams(next);
-            }}
-          >
-            <option value="">Все</option>
-            {(meta?.brands || []).map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Модель
-          <select
-            name="model"
-            defaultValue={filters.model || ""}
-            onChange={(e) => {
-              const next = new URLSearchParams(params);
-              const model = e.target.value;
-              if (!model) next.delete("model");
-              else next.set("model", model);
-              if (filters.brand) next.set("brand", filters.brand);
-              setParams(next);
-            }}
-          >
-            <option value="">Все</option>
-            {[...new Set(models)].map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Цена от
-          <input name="price_from" type="number" defaultValue={filters.price_from || ""} placeholder="₽" />
-        </label>
-        <label>
-          Цена до
-          <input name="price_to" type="number" defaultValue={filters.price_to || ""} placeholder="₽" />
-        </label>
-        <label>
-          Поиск
-          <input name="q" defaultValue={filters.q || ""} placeholder="Kia Sportage…" />
-        </label>
-        <input type="hidden" name="country" value={filters.country || ""} />
+        <CatalogFiltersForm
+          filters={filters}
+          filterKey={filterKey}
+          meta={meta}
+          onSubmit={onSubmit}
+          onBrandChange={onBrandChange}
+          onModelChange={onModelChange}
+        />
 
-        <button type="button" className="btn btn-ghost" onClick={() => setMore((v) => !v)}>
-          {more ? "Скрыть фильтры" : "Ещё фильтры"}
-        </button>
-        <button type="submit" className="btn btn-primary">
-          Показать
-        </button>
-
-        {more && (
-          <div className="filters-more">
-            <label>
-              Кузов
-              <input name="body" defaultValue={filters.body || ""} placeholder="седан / кроссовер" />
-            </label>
-            <label>
-              Топливо
-              <input name="fuel" defaultValue={filters.fuel || ""} placeholder="бензин" />
-            </label>
-            <label>
-              Привод
-              <select name="drive" defaultValue={filters.drive || ""}>
-                <option value="">Любой</option>
-                <option value="передний">Передний</option>
-                <option value="задний">Задний</option>
-                <option value="полный">Полный</option>
-              </select>
-            </label>
-            <label>
-              КПП
-              <input name="transmission" defaultValue={filters.transmission || ""} placeholder="автомат" />
-            </label>
-            <label>
-              Год от
-              <input name="year_from" type="number" defaultValue={filters.year_from || ""} />
-            </label>
-            <label>
-              Год до
-              <input name="year_to" type="number" defaultValue={filters.year_to || ""} />
-            </label>
-            <label>
-              Пробег до, тыс. км
-              <input name="mileage_to" type="number" defaultValue={filters.mileage_to || ""} />
-            </label>
-            <label>
-              Мощность до, л.с.
-              <input name="power_to" type="number" defaultValue={filters.power_to || ""} />
-            </label>
-          </div>
-        )}
-      </form>
-
-      <p className="count">
-        Найдено: {total}
-        {isLoading ? " · загружаем…" : ""}
-        {list.length > 0 && list.length < total ? ` · показано ${list.length}` : ""}
-      </p>
-
-      {list.length === 0 && !isLoading ? (
-        <p className="empty">
-          Ничего не найдено. <Link to="/catalog">Сбросить фильтры</Link>
-        </p>
-      ) : (
-        <>
-          <div className="vehicle-grid">
-            {list.map((v) => (
-              <VehicleCard key={v.public_slug} vehicle={v} />
-            ))}
-          </div>
-          {canMore && (
-            <div className="catalog-more">
-              <button type="button" className="btn btn-ghost" disabled={busy} onClick={loadMore}>
-                {busy ? "Загрузка…" : "Показать ещё"}
-              </button>
-            </div>
-          )}
-        </>
-      )}
+        <CatalogGrid
+          list={list}
+          total={total}
+          isLoading={isLoading}
+          canMore={canMore}
+          busy={busy}
+          onLoadMore={loadMore}
+        />
       </div>
     </>
   );

@@ -64,7 +64,13 @@ function upsertNormalized(
     foreign_price: nv.foreign_price,
     foreign_currency: nv.foreign_currency,
     estimated_total_rub: priced?.total_rub ?? existing?.estimated_total_rub ?? null,
-    specifications: priced?.breakdown ?? existing?.specifications ?? {},
+    specifications: priced
+      ? {
+          ...priced.breakdown,
+          recycling_note: priced.recycling_note,
+          age_band: priced.age_band,
+        }
+      : existing?.specifications ?? {},
     images: nv.images.length ? nv.images : existing?.images || [],
   };
 
