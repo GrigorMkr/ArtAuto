@@ -156,8 +156,105 @@ export async function fetchEncarPage(
 }
 
 export async function fetchEncarGallery(carId: string): Promise<string[]> {
-  if (!carId) return [];
-  const url = `https://api.encar.com/v1/readside/vehicle/${encodeURIComponent(carId)}?include=PHOTOS`;
+  const detail = await fetchEncarDetail(carId);
+  return detail?.images || [];
+}
+
+export type EncarDetail = {
+  images: string[];
+  brand: string;
+  model: string;
+  trim: string;
+  year: number | null;
+  mileage_km: number | null;
+  fuel_type: string;
+  transmission: string;
+  drive: string;
+  body_type: string;
+  engine_cc: number | null;
+  color: string;
+  foreign_price: number | null;
+  seats: number | null;
+};
+
+const COLOR_MAP: Record<string, string> = {
+  흰색: "белый",
+  흰색투톤: "белый",
+  검정: "чёрный",
+  검정색: "чёрный",
+  검은색: "чёрный",
+  쥐색: "серый",
+  회색: "серый",
+  은색: "серебристый",
+  실버: "серебристый",
+  청색: "синий",
+  파란색: "синий",
+  빨강: "красный",
+  빨간색: "красный",
+  진주: "жемчужный",
+  갈색: "коричневый",
+  베이지: "бежевый",
+  녹색: "зелёный",
+  노랑: "жёлтый",
+  보라: "фиолетовый",
+  골드: "золотистый",
+  오렌지: "оранжевый",
+  청옥색: "бирюзовый",
+};
+
+const TRANS_MAP: Record<string, string> = {
+  오토: "автомат",
+  자동: "автомат",
+  수동: "механика",
+  CVT: "CVT",
+  DCT: "робот",
+  AMT: "робот",
+};
+
+const BODY_MAP: Record<string, string> = {
+  SUV: "SUV",
+  준중형차: "компакт",
+  중형차: "средний класс",
+  대형차: "полноразмерный",
+  경차: "кей-кар",
+  소형차: "малолитражка",
+  승용: "легковое",
+  스포츠카: "спорткар",
+  픽업: "пикап",
+  밴: "фургон",
+  버스: "автобус",
+};
+
+function mapColor(name?: string | null) {
+  if (!name) return "";
+  return COLOR_MAP[name] || stripCjk(name) || name;
+}
+
+function mapTransmission(name?: string | null) {
+  if (!name) return "";
+  return TRANS_MAP[name] || stripCjk(name) || name;
+}
+
+function mapBody(name?: string | null) {
+  if (!name) return "";
+  return BODY_MAP[name] || stripCjk(name) || name;
+}
+
+function parseDrive(...parts: Array<string | null | undefined>) {
+  const text = parts.filter(Boolean).join(" ").toUpperCase();
+  if (/\bAWD\b|\b4WD\b|4MATIC|XDRIVE|QUATTRO|ALL[\s-]?WHEEL/.test(text)) return "полный";
+  if (/\bRWD\b|REAR/.test(text)) return "задний";
+  if (/\bFWD\b|2WD|FF\b/.test(text)) return "передний";
+  return "";
+}
+
+/**
+ * Full Encar vehicle card: photos + technical fields from CATEGORY/SPEC.
+ */
+export async function fetchEncarDetail(carId: string): Promise<EncarDetail | null> {
+  if (!carId) return null;
+  const include = "CATEGORY,SPEC,ADVERTISEMENT,PHOTOS";
+  const url = `https://api.encar.com/v1/readside/vehicle/${encodeURIComponent(carId)}?include=${encodeURIComponent(include)}`;
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(15000),
@@ -168,10 +265,34 @@ export async function fetchEncarGallery(carId: string): Promise<string[]> {
         Origin: "https://www.encar.com",
       },
     });
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const json = (await res.json()) as {
-      photos?: Array<{ path?: string; location?: string; code?: string }>;
+      photos?: Array<{ path?: string; location?: string }>;
+      category?: {
+        manufacturerEnglishName?: string;
+        manufacturerName?: string;
+        modelGroupEnglishName?: string;
+        modelGroupName?: string;
+        modelName?: string;
+        gradeEnglishName?: string;
+        gradeName?: string;
+        gradeDetailEnglishName?: string;
+        gradeDetailName?: string;
+        formYear?: string;
+      };
+      spec?: {
+        mileage?: number;
+        displacement?: number;
+        transmissionName?: string;
+        fuelName?: string;
+        colorName?: string;
+        seatCount?: number;
+        bodyName?: string;
+      };
+      advertisement?: { price?: number };
+      manage?: { dummyVehicleId?: number };
     };
+
     const out: string[] = [];
     for (const p of json.photos || []) {
       const u = photoUrl(p.path || p.location || "");
@@ -188,9 +309,52 @@ export async function fetchEncarGallery(carId: string): Promise<string[]> {
       };
       return score(a) - score(b);
     });
-    return out.slice(0, 16);
+
+    const cat = json.category || {};
+    const spec = json.spec || {};
+    const brandRaw = cat.manufacturerEnglishName || cat.manufacturerName || "";
+    const modelRaw =
+      cat.modelGroupEnglishName || cat.modelGroupName || cat.modelName || "";
+    const names = latinizeVehicle(brandRaw, modelRaw, cat.gradeEnglishName || cat.gradeName || "");
+    const fuel = FUEL_MAP[spec.fuelName || ""] || stripCjk(spec.fuelName || "");
+    const isEv = /электро|전기|EV/i.test(fuel) || spec.fuelName === "전기";
+    const drive = parseDrive(
+      cat.gradeEnglishName,
+      cat.gradeName,
+      cat.gradeDetailEnglishName,
+      cat.gradeDetailName
+    );
+    const year = cat.formYear ? Number(cat.formYear) : null;
+    const price =
+      json.advertisement?.price != null
+        ? Math.round(Number(json.advertisement.price) * 10000)
+        : null;
+
+    return {
+      images: out.slice(0, 16),
+      brand: names.brand,
+      model: names.model || stripCjk(modelRaw) || "Model",
+      trim: stripCjk(
+        [cat.gradeEnglishName || cat.gradeName, cat.gradeDetailEnglishName || cat.gradeDetailName]
+          .filter(Boolean)
+          .join(" · ")
+      ),
+      year: Number.isFinite(year) ? year : null,
+      mileage_km: spec.mileage != null ? Math.round(Number(spec.mileage)) : null,
+      fuel_type: fuel,
+      transmission: mapTransmission(spec.transmissionName),
+      drive,
+      body_type: mapBody(spec.bodyName),
+      engine_cc:
+        !isEv && spec.displacement != null && Number(spec.displacement) > 200
+          ? Math.round(Number(spec.displacement))
+          : null,
+      color: mapColor(spec.colorName),
+      foreign_price: price,
+      seats: spec.seatCount != null ? Number(spec.seatCount) : null,
+    };
   } catch {
-    return [];
+    return null;
   }
 }
 

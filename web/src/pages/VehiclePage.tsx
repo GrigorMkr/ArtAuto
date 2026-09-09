@@ -4,10 +4,9 @@ import { useGetVehicleQuery, useCreateDealMutation } from "../store/apiSlice";
 import { countryLabel, formatRub } from "../api";
 import { LeadForm } from "../components/LeadForm";
 import { Reveal } from "../components/Motion";
-import { CarPhoto } from "../components/CarPhoto";
+import { DetailGallery } from "../components/DetailGallery";
 import { useAuth } from "../auth";
-import { useEffect, useState } from "react";
-import classNames from "classnames";
+import { useEffect, useMemo, useState } from "react";
 
 export function VehiclePage() {
   const { slug = "" } = useParams();
@@ -22,6 +21,35 @@ export function VehiclePage() {
     setActive(0);
   }, [vehicle?.public_slug]);
 
+  const facts = useMemo(() => {
+    if (!vehicle) return [] as Array<{ label: string; value: string }>;
+    const seats = Number(vehicle.specifications?.seats);
+    return [
+      vehicle.year != null ? { label: "Год", value: String(vehicle.year) } : null,
+      vehicle.mileage_km != null
+        ? {
+            label: "Пробег",
+            value: `${new Intl.NumberFormat("ru-RU").format(vehicle.mileage_km)} км`,
+          }
+        : null,
+      vehicle.fuel_type ? { label: "Топливо", value: vehicle.fuel_type } : null,
+      vehicle.transmission ? { label: "КПП", value: vehicle.transmission } : null,
+      vehicle.drive ? { label: "Привод", value: vehicle.drive } : null,
+      vehicle.body_type ? { label: "Кузов", value: vehicle.body_type } : null,
+      vehicle.engine_cc != null && vehicle.engine_cc > 0
+        ? { label: "Объём", value: `${vehicle.engine_cc} см³` }
+        : null,
+      vehicle.power_hp != null ? { label: "Мощность", value: `${vehicle.power_hp} л.с.` } : null,
+      vehicle.color ? { label: "Цвет", value: vehicle.color } : null,
+      vehicle.trim ? { label: "Комплектация", value: vehicle.trim } : null,
+      Number.isFinite(seats) && seats > 0 ? { label: "Мест", value: String(seats) } : null,
+      {
+        label: "Статус",
+        value: vehicle.status === "AVAILABLE" ? "Доступен" : vehicle.status,
+      },
+    ].filter(Boolean) as Array<{ label: string; value: string }>;
+  }, [vehicle]);
+
   if (isLoading) return <p className="muted">Загрузка…</p>;
   if (isError || !vehicle) {
     return (
@@ -31,9 +59,10 @@ export function VehiclePage() {
     );
   }
 
-  const breakdown = vehicle.specifications || {};
+  const breakdown = Object.entries(vehicle.specifications || {}).filter(
+    ([k, v]) => k !== "seats" && typeof v === "number"
+  );
   const photos = vehicle.images || [];
-  const main = photos[active] || photos[0];
 
   return (
     <>
@@ -49,149 +78,119 @@ export function VehiclePage() {
         </Link>
       </Reveal>
 
-      <Reveal delay={0.08}>
+      <Reveal delay={0.06}>
         <article className="detail">
-          <div className="detail-media">
-            {main ? (
-              <CarPhoto
-                className="detail-hero"
-                src={main}
-                alt={`${vehicle.brand} ${vehicle.model}`}
-                eager
-              />
-            ) : (
-              <div className="vehicle-card__placeholder large">
-                {vehicle.brand} {vehicle.model}
-              </div>
-            )}
-            {photos.length > 1 && (
-              <div className="thumbs" role="listbox" aria-label="Фотографии автомобиля">
-                {photos.map((src, i) => (
-                  <button
-                    key={`${src}-${i}`}
-                    type="button"
-                    className={classNames("thumbs__item", { "thumbs__item--active": i === active })}
-                    onClick={() => setActive(i)}
-                    aria-label={`Фото ${i + 1}`}
-                    aria-selected={i === active}
-                  >
-                    <CarPhoto src={src} alt="" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <DetailGallery
+            photos={photos}
+            alt={`${vehicle.brand} ${vehicle.model}`}
+            active={active}
+            onChange={setActive}
+          />
 
           <div className="detail-info">
-            <p className="eyebrow">
-              {countryLabel(vehicle.country)}
-              {vehicle.source === "encar"
-                ? " · Encar"
-                : vehicle.source === "dongchedi"
-                  ? " · Dongchedi"
-                  : vehicle.source
-                    ? ` · ${vehicle.source}`
-                    : ""}
-            </p>
-            <h1>
-              {vehicle.brand} {vehicle.model}
-              {vehicle.year ? ` ${vehicle.year}` : ""}
-            </h1>
-            <p className="lede">
-              {[
-                vehicle.mileage_km != null
-                  ? `${new Intl.NumberFormat("ru-RU").format(vehicle.mileage_km)} км`
-                  : null,
-                vehicle.fuel_type,
-                vehicle.transmission,
-                vehicle.drive,
-                vehicle.color,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-
-            <p className="price-xl">{formatRub(vehicle.estimated_total_rub)}</p>
-            {user ? (
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={adding}
-                onClick={async () => {
-                  try {
-                    await createDeal({ vehicle_slug: vehicle.public_slug }).unwrap();
-                    setDealMsg("Добавлено в кабинет. Откройте сделки, чтобы видеть статус отправки.");
-                  } catch {
-                    setDealMsg("Не удалось добавить. Попробуйте из кабинета.");
-                  }
-                }}
-              >
-                {adding ? "Добавляем…" : "Добавить в кабинет"}
-              </button>
-            ) : (
-              <Link className="btn btn-primary" to="/register">
-                Зарегистрироваться и вести сделку
-              </Link>
-            )}
-            {dealMsg && <p className="ok">{dealMsg}</p>}
-            {vehicle.source_url ? (
-              <a
-                className="detail-source"
-                href={vehicle.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+            <section className="detail-panel detail-panel--hero">
+              <p className="eyebrow">
+                {countryLabel(vehicle.country)}
                 {vehicle.source === "encar"
-                  ? "Открыть оригинал объявления на Encar"
+                  ? " · Encar"
                   : vehicle.source === "dongchedi"
-                    ? "Открыть оригинал объявления на Dongchedi"
-                    : "Открыть оригинал объявления"}
-              </a>
-            ) : null}
-            {vehicle.foreign_price != null && (
-              <p className="muted">
-                Цена авто: {new Intl.NumberFormat("ru-RU").format(vehicle.foreign_price)}{" "}
-                {vehicle.foreign_currency}
+                    ? " · Dongchedi"
+                    : vehicle.source
+                      ? ` · ${vehicle.source}`
+                      : ""}
               </p>
-            )}
-
-            <dl className="specs">
-              {vehicle.engine_cc != null && vehicle.engine_cc > 0 && (
-                <div>
-                  <dt>Объём</dt>
-                  <dd>{vehicle.engine_cc} см³</dd>
-                </div>
+              <h1>
+                {vehicle.brand} {vehicle.model}
+                {vehicle.year ? ` · ${vehicle.year}` : ""}
+              </h1>
+              <p className="lede">
+                {[
+                  vehicle.mileage_km != null
+                    ? `${new Intl.NumberFormat("ru-RU").format(vehicle.mileage_km)} км`
+                    : null,
+                  vehicle.fuel_type,
+                  vehicle.transmission,
+                  vehicle.drive,
+                  vehicle.color,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Параметры уточняются по оригиналу объявления"}
+              </p>
+              <p className="price-xl">{formatRub(vehicle.estimated_total_rub)}</p>
+              {vehicle.foreign_price != null && (
+                <p className="detail-foreign">
+                  Цена авто: {new Intl.NumberFormat("ru-RU").format(vehicle.foreign_price)}{" "}
+                  {vehicle.foreign_currency}
+                </p>
               )}
-              {vehicle.power_hp != null && (
-                <div>
-                  <dt>Мощность</dt>
-                  <dd>{vehicle.power_hp} л.с.</dd>
-                </div>
-              )}
-              {vehicle.body_type && (
-                <div>
-                  <dt>Кузов</dt>
-                  <dd>{vehicle.body_type}</dd>
-                </div>
-              )}
-              <div>
-                <dt>Статус</dt>
-                <dd>{vehicle.status === "AVAILABLE" ? "Доступен" : vehicle.status}</dd>
+              <div className="detail-actions">
+                {user ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={adding}
+                    onClick={async () => {
+                      try {
+                        await createDeal({ vehicle_slug: vehicle.public_slug }).unwrap();
+                        setDealMsg("Добавлено в кабинет. Откройте сделки, чтобы видеть статус.");
+                      } catch {
+                        setDealMsg("Не удалось добавить. Попробуйте из кабинета.");
+                      }
+                    }}
+                  >
+                    {adding ? "Добавляем…" : "Добавить в кабинет"}
+                  </button>
+                ) : (
+                  <Link className="btn btn-primary" to="/register">
+                    Зарегистрироваться и вести сделку
+                  </Link>
+                )}
+                {vehicle.source_url ? (
+                  <a
+                    className="btn btn-ghost detail-source-btn"
+                    href={vehicle.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {vehicle.source === "encar"
+                      ? "Оригинал на Encar"
+                      : vehicle.source === "dongchedi"
+                        ? "Оригинал на Dongchedi"
+                        : "Оригинал объявления"}
+                  </a>
+                ) : null}
               </div>
-            </dl>
+              {dealMsg && <p className="ok">{dealMsg}</p>}
+            </section>
 
-            {Object.keys(breakdown).length > 0 && (
-              <div className="breakdown">
+            <section className="detail-panel">
+              <h3>Характеристики</h3>
+              {facts.length ? (
+                <dl className="specs">
+                  {facts.map((f) => (
+                    <div key={f.label}>
+                      <dt>{f.label}</dt>
+                      <dd>{f.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="muted">Подробности появятся после обновления карточки с площадки.</p>
+              )}
+            </section>
+
+            {breakdown.length > 0 && (
+              <section className="detail-panel breakdown">
                 <h3>Из чего складывается цена</h3>
                 <ul>
-                  {Object.entries(breakdown).map(([k, v]) => (
+                  {breakdown.map(([k, v]) => (
                     <li key={k}>
                       <span>{labelBreakdown(k)}</span>
                       <strong>{formatRub(Number(v))}</strong>
                     </li>
                   ))}
                 </ul>
-              </div>
+              </section>
             )}
 
             <LeadForm vehicleSlug={vehicle.public_slug} />

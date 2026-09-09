@@ -25,7 +25,7 @@ function isOkBrand(v: Vehicle) {
 
 function slim(v: Vehicle) {
   const names = latinizeVehicle(v.brand, v.model, v.trim || v.generation);
-  const imgs = (v.images || []).slice(0, 8);
+  const imgs = (v.images || []).slice(0, 12);
   return {
     public_slug: `${v.source}-${v.source_listing_id}`,
     country: v.country,
