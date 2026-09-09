@@ -201,27 +201,63 @@ export type EncarDetail = {
 const COLOR_MAP: Record<string, string> = {
   흰색: "белый",
   흰색투톤: "белый",
+  화이트: "белый",
   검정: "чёрный",
   검정색: "чёрный",
   검은색: "чёрный",
+  블랙: "чёрный",
   쥐색: "серый",
   회색: "серый",
+  은회색: "серебристо-серый",
   은색: "серебристый",
+  명은색: "серебристый",
   실버: "серебристый",
   청색: "синий",
   파란색: "синий",
+  하늘색: "голубой",
+  청옥색: "бирюзовый",
   빨강: "красный",
   빨간색: "красный",
+  레드: "красный",
+  자주색: "бордовый",
   진주: "жемчужный",
+  진주색: "жемчужный",
   갈색: "коричневый",
   베이지: "бежевый",
   녹색: "зелёный",
+  담녹색: "светло-зелёный",
+  연두색: "салатовый",
   노랑: "жёлтый",
+  노란색: "жёлтый",
   보라: "фиолетовый",
   골드: "золотистый",
+  금색: "золотистый",
+  연금색: "золотистый",
   오렌지: "оранжевый",
-  청옥색: "бирюзовый",
+  주황색: "оранжевый",
+  핑크: "розовый",
+  분홍색: "розовый",
+  보라색: "фиолетовый",
+  남색: "тёмно-синий",
+  카키: "хаки",
+  청록색: "бирюзовый",
 };
+
+/** Ordered longer keys first so 은회색 beats 회색. */
+const COLOR_KEYS = Object.keys(COLOR_MAP).sort((a, b) => b.length - a.length);
+
+function mapColor(name?: string | null) {
+  if (!name) return "";
+  const raw = String(name).trim();
+  if (COLOR_MAP[raw]) return COLOR_MAP[raw];
+  for (const key of COLOR_KEYS) {
+    if (raw.includes(key)) return COLOR_MAP[key];
+  }
+  const stripped = stripCjk(raw).trim();
+  // Never leave Hangul/CJK in the catalog UI.
+  if (!stripped || /[\u3000-\u9fff\uac00-\ud7af]/.test(stripped)) return "";
+  return stripped;
+}
 
 const TRANS_MAP: Record<string, string> = {
   오토: "автомат",
@@ -240,25 +276,30 @@ const BODY_MAP: Record<string, string> = {
   경차: "кей-кар",
   소형차: "малолитражка",
   승용: "легковое",
+  승합차: "минивэн",
+  화물차: "грузовой",
   스포츠카: "спорткар",
   픽업: "пикап",
   밴: "фургон",
   버스: "автобус",
 };
 
-function mapColor(name?: string | null) {
-  if (!name) return "";
-  return COLOR_MAP[name] || stripCjk(name) || name;
-}
-
 function mapTransmission(name?: string | null) {
   if (!name) return "";
-  return TRANS_MAP[name] || stripCjk(name) || name;
+  const mapped = TRANS_MAP[name] || stripCjk(name);
+  if (!mapped || /[\u3000-\u9fff\uac00-\ud7af]/.test(mapped)) return TRANS_MAP[name] || "";
+  return mapped;
 }
 
 function mapBody(name?: string | null) {
   if (!name) return "";
-  return BODY_MAP[name] || stripCjk(name) || name;
+  if (BODY_MAP[name]) return BODY_MAP[name];
+  for (const [k, v] of Object.entries(BODY_MAP)) {
+    if (name.includes(k)) return v;
+  }
+  const mapped = stripCjk(name);
+  if (!mapped || /[\u3000-\u9fff\uac00-\ud7af]/.test(mapped)) return "";
+  return mapped;
 }
 
 function parseDrive(...parts: Array<string | null | undefined>) {
