@@ -14,6 +14,7 @@ export type NormalizedImport = {
   model: string;
   trim: string;
   year: number | null;
+  year_month?: string | null;
   mileage_km: number | null;
   fuel_type: string;
   transmission: string;

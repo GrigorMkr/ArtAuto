@@ -5,8 +5,12 @@ import {
   calculateRecyclingFee,
   recyclingAgeGroup,
   recyclingExplain,
+  recyclingCoefficient,
   PREFERENTIAL_POWER_KW,
+  BASE_RECYCLING_RUB,
 } from "./services/recycling.js";
+import { estimatePowerHp, hpToKw, resolveEngineCc } from "./services/powerEstimate.js";
+import { vehicleAgeYears, AGE_BAND_LABELS } from "./services/vehicleAge.js";
 
 type Rates = { CNY: number; KRW: number; EUR: number; USD: number };
 type SettingsMap = Record<string, number>;
@@ -18,6 +22,13 @@ export function commercialRateFromStore(code: string, store = loadStore()) {
   return row.official_rate_rub * (1 + row.commercial_markup_pct / 100);
 }
 
+/** CBR / official rate — used for customs valuation (как у Silver Auto). */
+export function officialRateFromStore(code: string, store = loadStore()) {
+  const row = store.fx_rates.find((r) => r.code === code);
+  if (!row) return code === "CNY" ? 11.8 : code === "KRW" ? 0.062 : code === "EUR" ? 98.5 : 91;
+  return row.official_rate_rub;
+}
+
 export function loadPricingContext() {
   const store = loadStore();
   const rates: Rates = {
@@ -26,69 +37,99 @@ export function loadPricingContext() {
     EUR: commercialRateFromStore("EUR", store),
     USD: commercialRateFromStore("USD", store),
   };
+  const official_rates: Rates = {
+    CNY: officialRateFromStore("CNY", store),
+    KRW: officialRateFromStore("KRW", store),
+    EUR: officialRateFromStore("EUR", store),
+    USD: officialRateFromStore("USD", store),
+  };
   const settings: SettingsMap = {};
   for (const [key, meta] of Object.entries(DEFAULT_SETTINGS)) {
     settings[key] = store.price_settings.find((s) => s.key === key)?.value ?? meta.value;
   }
-  // legacy freight fallbacks
   if (!store.price_settings.find((s) => s.key === "KR_FREIGHT_RUB") && settings.KR_TO_VLADIVOSTOK_RUB) {
     settings.KR_FREIGHT_RUB = settings.KR_TO_VLADIVOSTOK_RUB;
   }
   if (!store.price_settings.find((s) => s.key === "CN_FREIGHT_RUB") && settings.CN_TO_VLADIVOSTOK_RUB) {
     settings.CN_FREIGHT_RUB = settings.CN_TO_VLADIVOSTOK_RUB;
   }
-  return { rates, settings, recycling_rules: store.recycling_rules };
+  return { rates, official_rates, settings };
 }
 
 export function estimateVehicleTotal(
   car: {
     country: "KR" | "CN";
     year: number;
-    engine_cc: number;
-    power_hp: number;
+    engine_cc?: number | null;
+    power_hp?: number | null;
     fuel_type: string;
     foreign_price: number;
     foreign_currency: string;
+    brand?: string;
+    model?: string;
+    trim?: string;
+    year_month?: string | number | null;
+    registration_month?: number | null;
   },
   ctx = loadPricingContext()
 ) {
-  const { rates, settings, recycling_rules } = ctx;
+  const { rates, settings } = ctx;
+  const official = ctx.official_rates ?? rates;
   const rate = rates[car.foreign_currency as keyof Rates] ?? rates.CNY;
-  const eurRub = rates.EUR;
+  const officialFx = official[car.foreign_currency as keyof Rates] ?? official.CNY;
+  // Display / client costs = commercial; customs duty base = official (CBR), like Silver Auto.
   const vehicle_rub = foreignPriceToRub(car.foreign_price, rate);
-  const customsValueEur = vehicle_rub / eurRub;
-  const ageYears = Math.max(0, new Date().getFullYear() - car.year);
-  const engineCc = Math.max(car.engine_cc || 1500, 1);
-  const powerHp = car.power_hp || 150;
-  const powerKw = Math.round(powerHp * 0.7355 * 100) / 100;
+  const customsValueRub = foreignPriceToRub(car.foreign_price, officialFx);
+  const eurRubOfficial = official.EUR;
+  const customsValueEur = customsValueRub / eurRubOfficial;
+
+  const ageYears = vehicleAgeYears({
+    year: car.year,
+    month: car.registration_month,
+    yearMonth: car.year_month,
+  });
+  const engineCc = resolveEngineCc({
+    engine_cc: car.engine_cc,
+    trim: car.trim,
+    model: car.model,
+    brand: car.brand,
+  });
+
+  const powerInfo = estimatePowerHp({
+    power_hp: car.power_hp,
+    engine_cc: engineCc,
+    fuel_type: car.fuel_type,
+    trim: car.trim,
+    brand: car.brand,
+    model: car.model,
+  });
+  const powerHp = powerInfo.hp;
+  const powerKw = hpToKw(powerHp);
 
   const customs = personalIceCustoms({
     ageYears,
     engineCc,
-    customsValueRub: vehicle_rub,
+    customsValueRub,
     customsValueEur,
-    eurRub,
+    eurRub: eurRubOfficial,
   });
 
   const ageGroup = recyclingAgeGroup(ageYears);
-  const fuelType = car.fuel_type.includes("дизель")
+  const fuelType = /дизель|diesel/i.test(car.fuel_type)
     ? "diesel"
-    : car.fuel_type.includes("электро")
+    : /электро|electric|EV/i.test(car.fuel_type)
       ? "electric"
-      : car.fuel_type.includes("гибрид")
+      : /гибрид|hybrid|DM-?i|HEV|PHEV/i.test(car.fuel_type)
         ? "hybrid"
         : "gasoline";
 
-  const recycling = calculateRecyclingFee(
-    {
-      ageGroup,
-      fuelType,
-      engineCc,
-      powerKw,
-      personalUse: true,
-    },
-    recycling_rules
-  );
+  const recycling = calculateRecyclingFee({
+    ageGroup,
+    fuelType,
+    engineCc,
+    powerKw,
+    personalUse: true,
+  });
 
   const isCn = car.country === "CN";
   const foreignExpenses = isCn
@@ -116,16 +157,27 @@ export function estimateVehicleTotal(
   });
 
   const preferential = powerKw <= PREFERENTIAL_POWER_KW;
-  const coeff = preferential ? (ageGroup === "under_3" ? 0.17 : 0.26) : recycling / 20000;
+  const coeff = recyclingCoefficient({ ageGroup, engineCc, powerKw, fuelType });
+  const age_band = customsAgeBand(ageYears);
 
   return {
     ...priced,
-    age_band: customsAgeBand(ageYears),
+    age_band,
+    age_band_label: AGE_BAND_LABELS[age_band] || age_band,
+    age_years: Math.round(ageYears * 10) / 10,
     recycling_age_group: ageGroup,
+    engine_cc_used: engineCc,
+    power_hp_used: powerHp,
+    power_estimated: powerInfo.estimated,
+    power_source: powerInfo.source,
+    customs_value_rub: customs.customs_value_rub,
     recycling_note: preferential
-      ? `Льготный утиль (до 160 л.с.): ${recyclingExplain(20000, coeff, recycling)}. Точный расчёт зависит от мощности модификации.`
-      : `Коммерческий утиль: ${recyclingExplain(20000, Math.round(coeff * 100) / 100, recycling)}.`,
+      ? `Льготный утиль (≤160 л.с.): ${recyclingExplain(BASE_RECYCLING_RUB, coeff, recycling)}. Возраст: ${AGE_BAND_LABELS[age_band]}. Точный расчёт зависит от мощности модификации.`
+      : `${BASE_RECYCLING_RUB.toLocaleString("ru-RU")} ₽ × ${coeff} · ${powerHp} л.с.${
+          powerInfo.estimated ? " (оценка)" : ""
+        } · ${AGE_BAND_LABELS[age_band]}. Точный расчёт зависит от мощности конкретной модификации.`,
     rates: { ...rates },
+    official_rates: { ...official },
   };
 }
 

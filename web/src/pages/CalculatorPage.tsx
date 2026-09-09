@@ -19,11 +19,15 @@ export function CalculatorPage() {
       const fd = new FormData(e.currentTarget);
       const country = String(fd.get("country") || "KR") as "KR" | "CN";
       try {
+        const year = Number(fd.get("year"));
+        const month = Number(fd.get("month") || 7);
+        const year_month = `${year}${String(month).padStart(2, "0")}`;
         const data = await calculate({
           country,
           foreign_price: Number(fd.get("foreign_price")),
           foreign_currency: country === "CN" ? "CNY" : "KRW",
-          year: Number(fd.get("year")),
+          year,
+          year_month,
           engine_cc: Number(fd.get("engine_cc")),
           power_hp: Number(fd.get("power_hp") || 150),
           fuel_type: String(fd.get("fuel_type") || "бензин"),
@@ -48,8 +52,8 @@ export function CalculatorPage() {
           <p className="eyebrow">Калькулятор</p>
           <h1>Бесплатный расчёт под ключ</h1>
           <p className="lede">
-            Возрастная группа, курс, расходы, таможня (единый платёж для физлица), утильсбор по
-            мощности и доставка — в одной смете.
+            Возраст считается автоматически по году и месяцу — как на TKS: до 3 / 3–5 / 5–7 /
+            старше 7 лет. Утильсбор зависит от мощности (л.с.).
           </p>
         </section>
       </Reveal>

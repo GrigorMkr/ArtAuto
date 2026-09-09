@@ -45,13 +45,22 @@ export type EncarOffer = {
   BadgeDetail?: string;
   FuelType?: string;
   FormYear?: string;
+  /** Often YYYYMM (first registration), e.g. 202507 */
   Year?: number;
   Mileage?: number;
   Price?: number;
+  /** 일반 = retail sale; 리스 / 렌트 = lease / rental takeover (exclude). */
+  SellType?: string;
   Photo?: string;
   Photos?: Array<{ location?: string; ordering?: number }>;
   OfficeCityState?: string;
 };
+
+/** Retail sales only — exclude lease (리스) and rent (렌트) takeovers. */
+export function isEncarRetailSellType(sellType?: string | null) {
+  if (!sellType) return true;
+  return sellType === "일반";
+}
 
 export type NormalizedImport = {
   country: "KR" | "CN";
@@ -62,6 +71,8 @@ export type NormalizedImport = {
   model: string;
   trim: string;
   year: number | null;
+  /** YYYYMM from Encar Year / yearMonth — for TKS age bands */
+  year_month?: string | null;
   mileage_km: number | null;
   fuel_type: string;
   transmission: string;
@@ -85,10 +96,15 @@ function photoUrl(path: string) {
 
 export function normalizeEncar(o: EncarOffer): NormalizedImport {
   const names = latinizeVehicle(o.Manufacturer || "", o.Model || "", o.Badge || "");
+  const yearNum = o.Year != null ? Number(o.Year) : NaN;
+  const yearMonth =
+    Number.isFinite(yearNum) && yearNum >= 190001 && yearNum <= 210012
+      ? String(Math.trunc(yearNum))
+      : null;
   const year = o.FormYear
     ? Number(o.FormYear)
-    : o.Year
-      ? Math.floor(Number(o.Year) / 100)
+    : yearMonth
+      ? Math.floor(Number(yearMonth) / 100)
       : null;
   const images = (o.Photos || [])
     .map((p) => photoUrl(p.location || ""))
@@ -111,6 +127,7 @@ export function normalizeEncar(o: EncarOffer): NormalizedImport {
     model: names.model || "Model",
     trim: stripCjk([o.Badge, o.BadgeDetail].filter(Boolean).join(" · ")),
     year: Number.isFinite(year) ? year : null,
+    year_month: yearMonth,
     mileage_km: o.Mileage != null ? Math.round(Number(o.Mileage)) : null,
     fuel_type: fuel,
     transmission: "",
@@ -131,7 +148,8 @@ export async function fetchEncarPage(
   opts?: { carType?: string; manufacturer?: string }
 ): Promise<EncarOffer[]> {
   const carType = opts?.carType || "A";
-  const parts = [`Hidden.N.`, `CarType.${carType}.`];
+  // SellType.일반 = normal retail; drops 리스 (lease) / 렌트 (rent) listings at the API.
+  const parts = [`Hidden.N.`, `CarType.${carType}.`, `SellType.일반.`];
   if (opts?.manufacturer) parts.push(`Manufacturer.${opts.manufacturer}.`);
   const params = new URLSearchParams({
     count: "true",
@@ -166,6 +184,7 @@ export type EncarDetail = {
   model: string;
   trim: string;
   year: number | null;
+  year_month: string | null;
   mileage_km: number | null;
   fuel_type: string;
   transmission: string;
@@ -175,6 +194,8 @@ export type EncarDetail = {
   color: string;
   foreign_price: number | null;
   seats: number | null;
+  /** True when Encar marks the listing as operating lease / rent takeover. */
+  is_lease: boolean;
 };
 
 const COLOR_MAP: Record<string, string> = {
@@ -279,6 +300,7 @@ export async function fetchEncarDetail(carId: string): Promise<EncarDetail | nul
         gradeDetailEnglishName?: string;
         gradeDetailName?: string;
         formYear?: string;
+        yearMonth?: string;
       };
       spec?: {
         mileage?: number;
@@ -289,7 +311,11 @@ export async function fetchEncarDetail(carId: string): Promise<EncarDetail | nul
         seatCount?: number;
         bodyName?: string;
       };
-      advertisement?: { price?: number };
+      advertisement?: {
+        price?: number;
+        advertisementType?: string;
+        leaseRentInfo?: unknown;
+      };
       manage?: { dummyVehicleId?: number };
     };
 
@@ -325,10 +351,16 @@ export async function fetchEncarDetail(carId: string): Promise<EncarDetail | nul
       cat.gradeDetailName
     );
     const year = cat.formYear ? Number(cat.formYear) : null;
+    const yearMonth = cat.yearMonth ? String(cat.yearMonth) : null;
     const price =
       json.advertisement?.price != null
         ? Math.round(Number(json.advertisement.price) * 10000)
         : null;
+    const advType = String(json.advertisement?.advertisementType || "").toUpperCase();
+    const isLease =
+      advType.includes("LEASE") ||
+      advType.includes("RENT") ||
+      json.advertisement?.leaseRentInfo != null;
 
     return {
       images: out.slice(0, 16),
@@ -340,6 +372,7 @@ export async function fetchEncarDetail(carId: string): Promise<EncarDetail | nul
           .join(" · ")
       ),
       year: Number.isFinite(year) ? year : null,
+      year_month: yearMonth,
       mileage_km: spec.mileage != null ? Math.round(Number(spec.mileage)) : null,
       fuel_type: fuel,
       transmission: mapTransmission(spec.transmissionName),
@@ -352,6 +385,7 @@ export async function fetchEncarDetail(carId: string): Promise<EncarDetail | nul
       color: mapColor(spec.colorName),
       foreign_price: price,
       seats: spec.seatCount != null ? Number(spec.seatCount) : null,
+      is_lease: isLease,
     };
   } catch {
     return null;
@@ -394,6 +428,7 @@ export async function fetchEncarBatch(total = 1200): Promise<NormalizedImport[]>
 
   const pushPage = async (page: EncarOffer[]) => {
     for (const item of page) {
+      if (!isEncarRetailSellType(item.SellType)) continue;
       const n = normalizeEncar(item);
       if (!n.source_listing_id || seen.has(n.source_listing_id)) continue;
       seen.add(n.source_listing_id);
@@ -447,16 +482,23 @@ export async function fetchEncarBatch(total = 1200): Promise<NormalizedImport[]>
     await new Promise((r) => setTimeout(r, 80));
   }
 
-  // Enrich galleries from detail photos API (list often returns only ~4)
+  // Enrich galleries from detail photos API (list often returns only ~4);
+  // also drop any OPERATING_LEASE that slipped past SellType.
   const concurrency = 8;
   let multi = 0;
+  const dropLease = new Set<string>();
   console.log(`[encar] enriching galleries for ${out.length} cars (x${concurrency})…`);
   for (let i = 0; i < out.length; i += concurrency) {
     const chunk = out.slice(i, i + concurrency);
     await Promise.all(
       chunk.map(async (row) => {
         try {
-          const gallery = await fetchEncarGallery(row.source_listing_id);
+          const detail = await fetchEncarDetail(row.source_listing_id);
+          if (detail?.is_lease) {
+            dropLease.add(row.source_listing_id);
+            return;
+          }
+          const gallery = detail?.images || [];
           if (gallery.length > row.images.length) {
             const merged = [...gallery, ...row.images].filter(Boolean);
             row.images = [...new Set(merged)].slice(0, 16);
@@ -473,6 +515,11 @@ export async function fetchEncarBatch(total = 1200): Promise<NormalizedImport[]>
     if (i + concurrency < out.length) await new Promise((r) => setTimeout(r, 60));
   }
 
-  console.log(`[encar] fetched ${out.length}, multi-photo=${multi}`);
-  return out;
+  const filtered = dropLease.size
+    ? out.filter((r) => !dropLease.has(r.source_listing_id))
+    : out;
+  console.log(
+    `[encar] fetched ${filtered.length}, multi-photo=${multi}, dropped_lease=${dropLease.size}`
+  );
+  return filtered;
 }

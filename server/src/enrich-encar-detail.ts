@@ -1,5 +1,5 @@
 /**
- * Enrich Encar cars with SPEC/CATEGORY from detail API (color, gearbox, body, etc.).
+ * Enrich Encar cars with SPEC/CATEGORY from detail API (color, gearbox, body, yearMonth, etc.).
  * Usage: npx tsx src/enrich-encar-detail.ts [limit]
  */
 import { loadStore, saveStore } from "./db.js";
@@ -25,6 +25,11 @@ async function main() {
         try {
           const d = await fetchEncarDetail(v.source_listing_id);
           if (!d) return;
+          if (d.is_lease) {
+            v.status = "HIDDEN";
+            updated += 1;
+            return;
+          }
           let changed = false;
           const set = <K extends keyof typeof v>(key: K, val: (typeof v)[K]) => {
             if (val == null || val === "" || val === v[key]) return;
@@ -48,6 +53,14 @@ async function main() {
             v.images = [...new Set([...d.images, ...(v.images || [])])].slice(0, 16);
             changed = true;
           }
+          if (d.year_month) {
+            const specs = { ...(v.specifications || {}) };
+            if (specs.year_month !== d.year_month) {
+              specs.year_month = d.year_month;
+              v.specifications = specs;
+              changed = true;
+            }
+          }
           if (d.seats != null) {
             const specs = { ...(v.specifications || {}) };
             if (specs.seats !== d.seats) {
@@ -62,16 +75,39 @@ async function main() {
               {
                 country: v.country,
                 year: v.year || new Date().getFullYear() - 3,
-                engine_cc: v.engine_cc || 1600,
-                power_hp: v.power_hp || 150,
+                engine_cc: v.engine_cc,
+                power_hp: v.power_hp,
                 fuel_type: v.fuel_type || "бензин",
                 foreign_price: v.foreign_price,
                 foreign_currency: v.foreign_currency,
+                brand: v.brand,
+                model: v.model,
+                trim: v.trim,
+                year_month: d.year_month || v.specifications?.year_month,
               },
               pricingCtx
             );
             v.estimated_total_rub = priced.total_rub;
-            v.specifications = { ...priced.breakdown, ...(v.specifications?.seats != null ? { seats: v.specifications.seats } : {}) };
+            if (!v.power_hp && priced.power_hp_used) {
+              v.power_hp = priced.power_hp_used;
+              v.power_kw = Math.round(priced.power_hp_used * 0.7355 * 100) / 100;
+            }
+            if (!v.engine_cc && priced.engine_cc_used) {
+              v.engine_cc = priced.engine_cc_used;
+            }
+            v.specifications = {
+              ...priced.breakdown,
+              customs_value_rub: priced.customs_value_rub,
+              recycling_note: priced.recycling_note,
+              age_band: priced.age_band,
+              age_band_label: priced.age_band_label,
+              age_years: priced.age_years,
+              power_hp_used: priced.power_hp_used,
+              ...(d.year_month || v.specifications?.year_month
+                ? { year_month: d.year_month || v.specifications?.year_month }
+                : {}),
+              ...(v.specifications?.seats != null ? { seats: v.specifications.seats } : {}),
+            };
           }
 
           if (changed) updated += 1;

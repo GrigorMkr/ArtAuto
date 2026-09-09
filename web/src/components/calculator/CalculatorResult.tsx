@@ -27,7 +27,11 @@ export const CalculatorResult = memo(function CalculatorResult({ result }: Props
     <>
       <p className="eyebrow">
         Итого
-        {result.age_band ? ` · ${AGE_LABEL[result.age_band] || result.age_band}` : ""}
+        {result.age_band_label
+          ? ` · ${result.age_band_label}`
+          : result.age_band
+            ? ` · ${AGE_LABEL[result.age_band] || result.age_band}`
+            : ""}
       </p>
       <p className="price-xl">{formatRub(result.total_rub)}</p>
       {result.rates && (

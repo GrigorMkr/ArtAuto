@@ -58,6 +58,9 @@ export type CalcResult = {
   total_rub: number;
   rates?: Record<string, number>;
   age_band?: string;
+  age_band_label?: string;
+  age_years?: number;
+  customs_value_rub?: number;
   recycling_note?: string;
 };
 

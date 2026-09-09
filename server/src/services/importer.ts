@@ -1,5 +1,6 @@
 import { loadStore, saveStore, type Vehicle } from "../db.js";
 import { createPricingContext, estimateVehicleTotal } from "../estimate.js";
+import { estimatePowerHp, hpToKw, resolveEngineCc } from "./powerEstimate.js";
 import { fetchEncarBatch, type NormalizedImport as EncarNorm } from "./sources/encarPublic.js";
 import {
   fetchDongchediBatch,
@@ -23,17 +24,40 @@ function upsertNormalized(
   );
 
   const year = nv.year || new Date().getFullYear() - 3;
+  const yearMonth =
+    ("year_month" in nv && nv.year_month) ||
+    existing?.specifications?.year_month ||
+    null;
+  const power = estimatePowerHp({
+    power_hp: nv.power_hp,
+    engine_cc: nv.engine_cc,
+    fuel_type: nv.fuel_type,
+    trim: nv.trim,
+    brand: nv.brand,
+    model: nv.model,
+  });
+  const engineCc = resolveEngineCc({
+    engine_cc: nv.engine_cc,
+    trim: nv.trim,
+    model: nv.model,
+    brand: nv.brand,
+  });
+  const powerHp = nv.power_hp ?? power.hp;
   const priced =
     nv.foreign_price != null
       ? estimateVehicleTotal(
           {
             country: nv.country,
             year,
-            engine_cc: nv.engine_cc || 1600,
-            power_hp: nv.power_hp || 150,
+            year_month: yearMonth,
+            engine_cc: engineCc,
+            power_hp: powerHp,
             fuel_type: nv.fuel_type || "бензин",
             foreign_price: nv.foreign_price,
             foreign_currency: nv.foreign_currency,
+            brand: nv.brand,
+            model: nv.model,
+            trim: nv.trim,
           },
           pricingCtx
         )
@@ -57,9 +81,9 @@ function upsertNormalized(
     transmission: nv.transmission,
     drive: nv.drive,
     body_type: nv.body_type,
-    engine_cc: nv.engine_cc,
-    power_hp: nv.power_hp,
-    power_kw: nv.power_hp ? Math.round(nv.power_hp * 0.7355 * 100) / 100 : null,
+    engine_cc: nv.engine_cc ?? engineCc,
+    power_hp: powerHp,
+    power_kw: hpToKw(powerHp),
     color: nv.color,
     foreign_price: nv.foreign_price,
     foreign_currency: nv.foreign_currency,
@@ -67,8 +91,15 @@ function upsertNormalized(
     specifications: priced
       ? {
           ...priced.breakdown,
+          customs_value_rub: priced.customs_value_rub,
           recycling_note: priced.recycling_note,
           age_band: priced.age_band,
+          age_band_label: priced.age_band_label,
+          age_years: priced.age_years,
+          power_hp_used: priced.power_hp_used,
+          power_source: power.source,
+          power_estimated: power.estimated ? 1 : 0,
+          ...(yearMonth ? { year_month: String(yearMonth) } : {}),
         }
       : existing?.specifications ?? {},
     images: nv.images.length ? nv.images : existing?.images || [],

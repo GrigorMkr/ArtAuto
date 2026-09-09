@@ -41,7 +41,14 @@ export const SKIP_SPEC_KEYS = new Set([
   "seats",
   "recycling_note",
   "age_band",
+  "age_band_label",
+  "age_years",
+  "year_month",
+  "power_hp_used",
+  "power_source",
+  "power_estimated",
   "customs_total_rub",
+  "customs_value_rub",
   "transport_to_vladivostok_rub",
   "extra_rub",
 ]);
@@ -56,6 +63,15 @@ export function calcLinesFromBreakdown(
     const n = typeof raw === "number" ? raw : Number(raw);
     if (!Number.isFinite(n)) return null;
     if ((key === "excise_rub" || key === "vat_rub") && n === 0) return null;
+    // Hide empty fee rows (KR packs bank/port/lab into ₩500k + broker).
+    if (
+      (key === "transfer_fee_rub" ||
+        key === "port_delivery_rub" ||
+        key === "laboratory_rub") &&
+      n === 0
+    ) {
+      return null;
+    }
     return { key, label: BREAKDOWN_LABELS[key] || key, value: n };
   }).filter(Boolean) as BreakdownLine[];
 

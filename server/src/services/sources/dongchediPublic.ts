@@ -1,4 +1,5 @@
 import { latinizeVehicle, stripCjk } from "../latinNames.js";
+import { parseEngineCcFromText, parsePowerHpFromText } from "../powerEstimate.js";
 
 export type DongchediSku = {
   sku_id?: number | string;
@@ -28,6 +29,7 @@ export type NormalizedImport = {
   model: string;
   trim: string;
   year: number | null;
+  year_month?: string | null;
   mileage_km: number | null;
   fuel_type: string;
   transmission: string;
@@ -176,6 +178,9 @@ export function normalizeDongchedi(o: DongchediSku): NormalizedImport {
   const names = latinizeVehicle(o.brand_name || "", o.series_name || "", o.car_name || o.title || "");
   const price = parsePriceWan(o.sh_price ?? o.origin_sh_price);
   const images = collectImages(o);
+  const titleBlob = [o.car_name, o.title, o.sub_title, o.series_name].filter(Boolean).join(" ");
+  const engine_cc = parseEngineCcFromText(titleBlob);
+  const power_hp = parsePowerHpFromText(titleBlob);
 
   return {
     country: "CN",
@@ -187,12 +192,16 @@ export function normalizeDongchedi(o: DongchediSku): NormalizedImport {
     trim: stripCjk(o.car_name || o.title || ""),
     year: o.car_year ? Number(o.car_year) : null,
     mileage_km: parseMileage(o.mileage),
-    fuel_type: "",
+    fuel_type: /DM-?i|HEV|PHEV|混动/i.test(titleBlob)
+      ? "гибрид"
+      : /纯电|EV/i.test(titleBlob)
+        ? "электро"
+        : "",
     transmission: "",
     drive: "",
     body_type: "",
-    engine_cc: null,
-    power_hp: null,
+    engine_cc,
+    power_hp,
     color: "",
     foreign_price: price,
     foreign_currency: "CNY",

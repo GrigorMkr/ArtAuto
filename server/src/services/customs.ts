@@ -36,15 +36,16 @@ const AGE_OVER_5: Array<[number | null, number]> = [
   [null, 5.7],
 ];
 
+/** Customs clearance fees from 01.01.2026 (PP RF №1638) — matches Silver Auto. */
 const CLEARANCE_FEES: Array<[number | null, number]> = [
-  [200000, 1067],
-  [450000, 2134],
-  [1200000, 4269],
-  [2700000, 11746],
-  [4200000, 16524],
+  [200000, 1231],
+  [450000, 2462],
+  [1200000, 4924],
+  [2700000, 13541],
+  [4200000, 18465],
   [5500000, 21344],
-  [7000000, 27540],
-  [null, 30000],
+  [10000000, 49240],
+  [null, 73860],
 ];
 
 function byCc(table: Array<[number | null, number]>, engineCc: number) {
@@ -61,7 +62,7 @@ export function clearanceFee(customsValueRub: number) {
   throw new Error("clearance fee rule not found");
 }
 
-/** Age bands as Silver Auto calculator: <3 / 3–5 / 5–7 / ≥7 */
+/** Age bands as TKS calculator: <3 / 3–5 / 5–7 / ≥7 (Decision 74). */
 export function customsAgeBand(ageYears: number) {
   if (ageYears < 3) return "under_3";
   if (ageYears < 5) return "from_3_to_5";

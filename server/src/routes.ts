@@ -287,6 +287,9 @@ const calcSchema = z.object({
   foreign_price: z.number().positive(),
   foreign_currency: z.enum(["KRW", "CNY"]).optional(),
   year: z.number().int().min(1990).max(2100),
+  /** YYYYMM — TKS age bands (до 3 / 3–5 / 5–7 / 7+) */
+  year_month: z.union([z.string(), z.number()]).optional(),
+  month: z.number().int().min(1).max(12).optional(),
   engine_cc: z.number().int().min(0).max(8000),
   power_hp: z.number().positive().optional().default(150),
   fuel_type: z.string().optional().default("бензин"),
@@ -298,9 +301,16 @@ api.post("/calculator", (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const d = parsed.data;
   const currency = d.foreign_currency ?? (d.country === "CN" ? "CNY" : "KRW");
+  const yearMonth =
+    d.year_month != null
+      ? String(d.year_month)
+      : d.month != null
+        ? `${d.year}${String(d.month).padStart(2, "0")}`
+        : undefined;
   const result = estimateVehicleTotal({
     country: d.country,
     year: d.year,
+    year_month: yearMonth,
     engine_cc: d.engine_cc || 1500,
     power_hp: d.power_hp,
     fuel_type: d.fuel_type,
@@ -329,6 +339,9 @@ api.post("/calculator", (req, res) => {
     return res.json({
       ...adjusted,
       age_band: result.age_band,
+      age_band_label: result.age_band_label,
+      age_years: result.age_years,
+      customs_value_rub: result.customs_value_rub,
       recycling_note: result.recycling_note,
       rates: { CNY: commercialRate("CNY"), KRW: commercialRate("KRW"), EUR: commercialRate("EUR") },
       settings: {
