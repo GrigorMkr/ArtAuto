@@ -1545,34 +1545,7 @@ html.is-brand-loading {
   font-size: clamp(1.55rem, 2.6vw, 2rem);
 }
 .detail-hero__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
   margin-bottom: 0.35rem;
-}
-.detail-source-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.28rem 0.55rem 0.28rem 0.28rem;
-  border-radius: 999px;
-  background: rgba(7, 19, 31, 0.05);
-  color: var(--ink);
-  text-decoration: none;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  flex-shrink: 0;
-}
-.detail-source-chip:hover {
-  background: rgba(7, 19, 31, 0.09);
-}
-.detail-source-chip__icon {
-  width: 1.35rem;
-  height: 1.35rem;
-  border-radius: 6px;
-  display: block;
 }
 .detail-price-block {
   margin: 0.15rem 0 0.85rem;

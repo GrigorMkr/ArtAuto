@@ -64,18 +64,6 @@ export const VehicleHeroPanel = memo(function VehicleHeroPanel({
           {countryLabel(vehicle.country)}
           {vehicle.trim ? ` · ${vehicle.trim}` : ""}
         </p>
-        {vehicle.source_url && SourceIcon ? (
-          <a
-            className="detail-source-chip"
-            href={vehicle.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={source.label}
-          >
-            <SourceIcon className="detail-source-chip__icon" />
-            <span>{vehicle.source === "encar" ? "Encar" : "Dongchedi"}</span>
-          </a>
-        ) : null}
       </div>
 
       <h1>
