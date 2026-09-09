@@ -161,10 +161,21 @@ export function CatalogPage() {
         ))}
       </div>
 
-      <form className="filters" onSubmit={onSubmit}>
+      <form className="filters" onSubmit={onSubmit} key={filterKey}>
         <label>
           Марка
-          <select name="brand" defaultValue={filters.brand || ""}>
+          <select
+            name="brand"
+            defaultValue={filters.brand || ""}
+            onChange={(e) => {
+              const next = new URLSearchParams(params);
+              const brand = e.target.value;
+              if (!brand) next.delete("brand");
+              else next.set("brand", brand);
+              next.delete("model");
+              setParams(next);
+            }}
+          >
             <option value="">Все</option>
             {(meta?.brands || []).map((b) => (
               <option key={b} value={b}>
@@ -175,7 +186,18 @@ export function CatalogPage() {
         </label>
         <label>
           Модель
-          <select name="model" defaultValue={filters.model || ""}>
+          <select
+            name="model"
+            defaultValue={filters.model || ""}
+            onChange={(e) => {
+              const next = new URLSearchParams(params);
+              const model = e.target.value;
+              if (!model) next.delete("model");
+              else next.set("model", model);
+              if (filters.brand) next.set("brand", filters.brand);
+              setParams(next);
+            }}
+          >
             <option value="">Все</option>
             {[...new Set(models)].map((m) => (
               <option key={m} value={m}>
@@ -194,7 +216,7 @@ export function CatalogPage() {
         </label>
         <label>
           Поиск
-          <input name="q" defaultValue={filters.q || ""} placeholder="Kia, Tayron…" />
+          <input name="q" defaultValue={filters.q || ""} placeholder="Kia Sportage…" />
         </label>
         <input type="hidden" name="country" value={filters.country || ""} />
 
@@ -219,14 +241,14 @@ export function CatalogPage() {
               Привод
               <select name="drive" defaultValue={filters.drive || ""}>
                 <option value="">Любой</option>
-                <option value="FWD">FWD</option>
-                <option value="RWD">RWD</option>
-                <option value="AWD">AWD</option>
+                <option value="передний">Передний</option>
+                <option value="задний">Задний</option>
+                <option value="полный">Полный</option>
               </select>
             </label>
             <label>
               КПП
-              <input name="transmission" defaultValue={filters.transmission || ""} />
+              <input name="transmission" defaultValue={filters.transmission || ""} placeholder="автомат" />
             </label>
             <label>
               Год от

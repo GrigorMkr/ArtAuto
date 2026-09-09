@@ -1,6 +1,6 @@
 /**
- * Drop near-duplicate listings (same car under different Encar IDs).
- * Prefer cover-image fingerprint; fall back to brand/model/year/price/mileage.
+ * Drop near-duplicate listings (same car under different IDs).
+ * Keys: any shared photo fingerprint, then brand/model/year/price/mileage.
  */
 export function dedupeVisualVehicles<
   T extends {
@@ -13,13 +13,17 @@ export function dedupeVisualVehicles<
     images?: string[] | null;
   },
 >(rows: T[]): T[] {
-  const seen = new Set<string>();
+  const seenImg = new Set<string>();
+  const seenMeta = new Set<string>();
   const out: T[] = [];
 
   for (const v of rows) {
-    const key = visualKey(v);
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const meta = metaKey(v);
+    const imgs = imageKeys(v);
+    const imgHit = imgs.some((k) => seenImg.has(k));
+    if (imgHit || seenMeta.has(meta)) continue;
+    for (const k of imgs) seenImg.add(k);
+    seenMeta.add(meta);
     out.push(v);
   }
   return out;
@@ -44,25 +48,41 @@ function unwrapImageUrl(src: string): string {
   return u;
 }
 
-function visualKey(v: {
+function imageKeys(v: { source: string; images?: string[] | null }): string[] {
+  const keys = new Set<string>();
+  for (const src of v.images || []) {
+    const raw = unwrapImageUrl(src);
+    try {
+      const parsed = new URL(raw);
+      const path = parsed.pathname.toLowerCase();
+      // Encar: …/42608203_001.jpg → shared listing photo id
+      const encar = path.match(/\/(\d{6,})_\d{3}\.(jpg|jpeg|png|webp)$/i);
+      if (encar) {
+        keys.add(`${v.source}|encar|${encar[1]}`);
+        continue;
+      }
+      // Dongchedi / byteimg hash folder
+      const hash = path.match(/\/([a-f0-9]{32})\b/i);
+      if (hash) {
+        keys.add(`${v.source}|hash|${hash[1].toLowerCase()}`);
+        continue;
+      }
+      keys.add(`${v.source}|path|${parsed.hostname.toLowerCase()}${path.split("~")[0]}`);
+    } catch {
+      keys.add(`${v.source}|raw|${raw.split("?")[0]}`);
+    }
+  }
+  return [...keys];
+}
+
+function metaKey(v: {
   source: string;
   brand: string;
   model: string;
   year?: number | null;
   mileage_km?: number | null;
   foreign_price?: number | null;
-  images?: string[] | null;
 }): string {
-  const cover = v.images?.[0];
-  if (cover) {
-    const raw = unwrapImageUrl(cover);
-    try {
-      const parsed = new URL(raw);
-      return `${v.source}|img|${parsed.hostname.toLowerCase()}${parsed.pathname}`;
-    } catch {
-      return `${v.source}|img|${raw.split("?")[0]}`;
-    }
-  }
   return [
     v.source,
     "meta",

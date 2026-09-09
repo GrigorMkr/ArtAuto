@@ -104,14 +104,32 @@ api.get("/catalog", (req, res) => {
 
   if (q.country === "KR" || q.country === "CN") rows = rows.filter((v) => v.country === q.country);
   if (q.brand) rows = rows.filter((v) => v.brand.toLowerCase() === String(q.brand).toLowerCase());
-  if (q.model) rows = rows.filter((v) => v.model.toLowerCase().includes(String(q.model).toLowerCase()));
+  if (q.model) rows = rows.filter((v) => v.model.toLowerCase() === String(q.model).toLowerCase());
   if (q.q) {
-    const s = String(q.q).toLowerCase();
-    rows = rows.filter((v) => v.brand.toLowerCase().includes(s) || v.model.toLowerCase().includes(s));
+    const tokens = String(q.q)
+      .toLowerCase()
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    rows = rows.filter((v) => {
+      const hay = `${v.brand} ${v.model} ${v.trim || ""}`.toLowerCase();
+      return tokens.every((t) => hay.includes(t));
+    });
   }
   if (q.fuel) rows = rows.filter((v) => v.fuel_type.includes(String(q.fuel)));
   if (q.transmission) rows = rows.filter((v) => v.transmission.includes(String(q.transmission)));
-  if (q.drive) rows = rows.filter((v) => v.drive === String(q.drive));
+  if (q.drive) {
+    const d = String(q.drive).toLowerCase();
+    rows = rows.filter((v) => {
+      const cur = (v.drive || "").toLowerCase();
+      if (d === "передний" || d === "fwd") return cur === "передний" || cur === "fwd";
+      if (d === "задний" || d === "rwd") return cur === "задний" || cur === "rwd";
+      if (d === "полный" || d === "awd" || d === "4wd") {
+        return cur === "полный" || cur === "awd" || cur === "4wd";
+      }
+      return cur === d;
+    });
+  }
   if (q.body) rows = rows.filter((v) => v.body_type.includes(String(q.body)));
   if (q.year_from) rows = rows.filter((v) => (v.year ?? 0) >= Number(q.year_from));
   if (q.year_to) rows = rows.filter((v) => (v.year ?? 9999) <= Number(q.year_to));

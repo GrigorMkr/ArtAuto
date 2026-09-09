@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent, type TouchEvent } from "react";
+import { createPortal } from "react-dom";
 import classNames from "classnames";
 import { CarPhoto } from "./CarPhoto";
 import { mediaUrl } from "../api";
@@ -13,6 +14,7 @@ type Props = {
 export function DetailGallery({ photos, alt, active, onChange }: Props) {
   const [lightbox, setLightbox] = useState(false);
   const touchX = useRef<number | null>(null);
+  const scrubbing = useRef(false);
   const list = photos.length ? photos : [];
   const current = list[active] || list[0];
 
@@ -38,7 +40,7 @@ export function DetailGallery({ photos, alt, active, onChange }: Props) {
   }
 
   function onScrub(e: MouseEvent<HTMLDivElement>) {
-    if (list.length < 2) return;
+    if (list.length < 2 || !scrubbing.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = Math.min(0.999, Math.max(0, (e.clientX - rect.left) / rect.width));
     onChange(Math.min(list.length - 1, Math.floor(ratio * list.length)));
@@ -65,12 +67,85 @@ export function DetailGallery({ photos, alt, active, onChange }: Props) {
     );
   }
 
+  const lightboxNode = lightbox
+    ? createPortal(
+        <div
+          className="lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Просмотр фото"
+          onClick={() => setLightbox(false)}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          <button
+            type="button"
+            className="lightbox__close"
+            aria-label="Закрыть"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightbox(false);
+            }}
+          >
+            ×
+          </button>
+          {list.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="lightbox__nav lightbox__nav--prev"
+                aria-label="Предыдущее"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  step(-1);
+                }}
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="lightbox__nav lightbox__nav--next"
+                aria-label="Следующее"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  step(1);
+                }}
+              >
+                ›
+              </button>
+            </>
+          )}
+          <div className="lightbox__frame" onClick={(e) => e.stopPropagation()}>
+            <img
+              className="lightbox__img"
+              src={mediaUrl(current)}
+              alt={alt}
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <p className="lightbox__meta" onClick={(e) => e.stopPropagation()}>
+            {active + 1} / {list.length} · клик вне фото — закрыть
+          </p>
+        </div>,
+        document.body
+      )
+    : null;
+
   return (
     <div className="detail-gallery">
       <div
         className={classNames("detail-gallery__stage", {
           "detail-gallery__stage--multi": list.length > 1,
         })}
+        onMouseDown={() => {
+          scrubbing.current = true;
+        }}
+        onMouseUp={() => {
+          scrubbing.current = false;
+        }}
+        onMouseLeave={() => {
+          scrubbing.current = false;
+        }}
         onMouseMove={onScrub}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
@@ -131,62 +206,7 @@ export function DetailGallery({ photos, alt, active, onChange }: Props) {
         </div>
       )}
 
-      {lightbox && (
-        <div
-          className="lightbox"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Просмотр фото"
-          onClick={() => setLightbox(false)}
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
-        >
-          <button
-            type="button"
-            className="lightbox__close"
-            aria-label="Закрыть"
-            onClick={() => setLightbox(false)}
-          >
-            ×
-          </button>
-          {list.length > 1 && (
-            <>
-              <button
-                type="button"
-                className="lightbox__nav lightbox__nav--prev"
-                aria-label="Предыдущее"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  step(-1);
-                }}
-              >
-                ‹
-              </button>
-              <button
-                type="button"
-                className="lightbox__nav lightbox__nav--next"
-                aria-label="Следующее"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  step(1);
-                }}
-              >
-                ›
-              </button>
-            </>
-          )}
-          <img
-            className="lightbox__img"
-            src={mediaUrl(current)}
-            alt={alt}
-            onClick={(e) => e.stopPropagation()}
-            referrerPolicy="no-referrer"
-          />
-          <p className="lightbox__meta">
-            {active + 1} / {list.length} · свайп или стрелки
-          </p>
-        </div>
-      )}
+      {lightboxNode}
     </div>
   );
 }

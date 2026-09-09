@@ -1135,16 +1135,25 @@ html.is-brand-loading {
 .lightbox {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 1000;
   display: grid;
   place-items: center;
   padding: 1.25rem;
   background: rgba(4, 10, 18, 0.92);
   touch-action: pan-y;
+  overscroll-behavior: contain;
 }
-.lightbox__img {
+.lightbox__frame {
   max-width: min(1100px, 100%);
   max-height: min(82vh, 100%);
+  display: grid;
+  place-items: center;
+}
+.lightbox__img {
+  max-width: 100%;
+  max-height: min(82vh, 100%);
+  width: auto;
+  height: auto;
   object-fit: contain;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 }

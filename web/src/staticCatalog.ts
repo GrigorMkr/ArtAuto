@@ -46,17 +46,35 @@ function applyFilters(rows: Vehicle[], filters: CatalogFilters = {}) {
   }
   if (filters.model) {
     const m = String(filters.model).toLowerCase();
-    out = out.filter((v) => v.model.toLowerCase().includes(m));
+    out = out.filter((v) => v.model.toLowerCase() === m);
   }
   if (filters.q) {
-    const s = String(filters.q).toLowerCase();
-    out = out.filter((v) => v.brand.toLowerCase().includes(s) || v.model.toLowerCase().includes(s));
+    const tokens = String(filters.q)
+      .toLowerCase()
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    out = out.filter((v) => {
+      const hay = `${v.brand} ${v.model} ${v.trim || ""}`.toLowerCase();
+      return tokens.every((t) => hay.includes(t));
+    });
   }
   if (filters.fuel) out = out.filter((v) => v.fuel_type.includes(String(filters.fuel)));
   if (filters.transmission) {
     out = out.filter((v) => v.transmission.includes(String(filters.transmission)));
   }
-  if (filters.drive) out = out.filter((v) => v.drive === String(filters.drive));
+  if (filters.drive) {
+    const d = String(filters.drive).toLowerCase();
+    out = out.filter((v) => {
+      const cur = (v.drive || "").toLowerCase();
+      if (d === "передний" || d === "fwd") return cur === "передний" || cur === "fwd";
+      if (d === "задний" || d === "rwd") return cur === "задний" || cur === "rwd";
+      if (d === "полный" || d === "awd" || d === "4wd") {
+        return cur === "полный" || cur === "awd" || cur === "4wd";
+      }
+      return cur === d;
+    });
+  }
   if (filters.body) out = out.filter((v) => v.body_type.includes(String(filters.body)));
   if (filters.year_from) out = out.filter((v) => (v.year ?? 0) >= Number(filters.year_from));
   if (filters.year_to) out = out.filter((v) => (v.year ?? 9999) <= Number(filters.year_to));
