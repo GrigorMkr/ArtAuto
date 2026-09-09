@@ -11,11 +11,26 @@ export function seed() {
   const store = loadStore();
 
   const byKey = new Map(store.price_settings.map((s) => [s.key, s]));
+  // Force-align Silver packing for CN fee lines that used to double-count.
+  const FORCE_VALUE = new Set([
+    "CN_TRANSFER_FEE_RUB",
+    "CN_PORT_DELIVERY_RUB",
+    "CN_LABORATORY_RUB",
+    "CN_FOREIGN_EXPENSES_CNY",
+    "CN_BROKER_RUB",
+    "CN_FREIGHT_RUB",
+    "CN_COMPANY_FEE_RUB",
+    "KR_TRANSFER_FEE_RUB",
+    "KR_PORT_DELIVERY_RUB",
+    "KR_LABORATORY_RUB",
+    "KR_COMPANY_FEE_RUB",
+  ]);
   for (const [key, meta] of Object.entries(DEFAULT_SETTINGS)) {
     const existing = byKey.get(key);
     if (existing) {
       existing.currency = meta.currency;
       existing.description = meta.description;
+      if (FORCE_VALUE.has(key)) existing.value = meta.value;
     } else {
       store.price_settings.push({
         key,

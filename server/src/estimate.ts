@@ -11,6 +11,7 @@ import {
 } from "./services/recycling.js";
 import { estimatePowerHp, hpToKw, resolveEngineCc } from "./services/powerEstimate.js";
 import { vehicleAgeYears, AGE_BAND_LABELS } from "./services/vehicleAge.js";
+import { classifyTksFuel } from "./services/trimSpecs.js";
 
 type Rates = { CNY: number; KRW: number; EUR: number; USD: number };
 type SettingsMap = Record<string, number>;
@@ -88,16 +89,18 @@ export function estimateVehicleTotal(
     month: car.registration_month,
     yearMonth: car.year_month,
   });
+  const tksFuel = classifyTksFuel(car.fuel_type);
   const engineCc = resolveEngineCc({
     engine_cc: car.engine_cc,
     trim: car.trim,
     model: car.model,
     brand: car.brand,
+    fuel_type: car.fuel_type,
   });
 
   const powerInfo = estimatePowerHp({
     power_hp: car.power_hp,
-    engine_cc: engineCc,
+    engine_cc: tksFuel === "electric" ? 0 : engineCc,
     fuel_type: car.fuel_type,
     trim: car.trim,
     brand: car.brand,
@@ -108,25 +111,31 @@ export function estimateVehicleTotal(
 
   const customs = personalIceCustoms({
     ageYears,
-    engineCc,
+    engineCc: tksFuel === "electric" ? 0 : engineCc,
     customsValueRub,
     customsValueEur,
     eurRub: eurRubOfficial,
+    fuelType: car.fuel_type,
+    tksFuel,
+    powerHp,
   });
 
   const ageGroup = recyclingAgeGroup(ageYears);
-  const fuelType = /дизель|diesel/i.test(car.fuel_type)
-    ? "diesel"
-    : /электро|electric|EV/i.test(car.fuel_type)
+  // Recycling: EV ladder vs ICE table (hybrids = ICE by engine cc / power).
+  // diesel string unused by recycling except electric — kept for clarity/TKS.
+  const fuelType =
+    tksFuel === "electric"
       ? "electric"
-      : /гибрид|hybrid|DM-?i|HEV|PHEV/i.test(car.fuel_type)
-        ? "hybrid"
-        : "gasoline";
+      : tksFuel === "diesel" || tksFuel === "hybrid_diesel"
+        ? "diesel"
+        : tksFuel === "hybrid_gas"
+          ? "hybrid"
+          : "gasoline";
 
   const recycling = calculateRecyclingFee({
     ageGroup,
     fuelType,
-    engineCc,
+    engineCc: tksFuel === "electric" ? 0 : engineCc,
     powerKw,
     personalUse: true,
   });
@@ -156,8 +165,16 @@ export function estimateVehicleTotal(
     delivery_russia_rub: settings.DELIVERY_VLADIVOSTOK_UFA_RUB,
   });
 
-  const preferential = powerKw <= PREFERENTIAL_POWER_KW;
-  const coeff = recyclingCoefficient({ ageGroup, engineCc, powerKw, fuelType });
+  const preferential =
+    tksFuel === "electric"
+      ? powerKw > 0 && powerKw <= 58.84
+      : powerKw > 0 && powerKw <= PREFERENTIAL_POWER_KW && engineCc > 0 && engineCc <= 3000;
+  const coeff = recyclingCoefficient({
+    ageGroup,
+    engineCc: tksFuel === "electric" ? 0 : engineCc,
+    powerKw,
+    fuelType,
+  });
   const age_band = customsAgeBand(ageYears);
 
   return {
@@ -166,15 +183,17 @@ export function estimateVehicleTotal(
     age_band_label: AGE_BAND_LABELS[age_band] || age_band,
     age_years: Math.round(ageYears * 10) / 10,
     recycling_age_group: ageGroup,
-    engine_cc_used: engineCc,
+    engine_cc_used: tksFuel === "electric" ? 0 : engineCc,
     power_hp_used: powerHp,
     power_estimated: powerInfo.estimated,
     power_source: powerInfo.source,
     customs_value_rub: customs.customs_value_rub,
     recycling_note: preferential
-      ? `Льготный утиль (≤160 л.с.): ${recyclingExplain(BASE_RECYCLING_RUB, coeff, recycling)}. Возраст: ${AGE_BAND_LABELS[age_band]}. Точный расчёт зависит от мощности модификации.`
-      : `${BASE_RECYCLING_RUB.toLocaleString("ru-RU")} ₽ × ${coeff} · ${powerHp} л.с.${
-          powerInfo.estimated ? " (оценка)" : ""
+      ? `Льготный утиль: ${recyclingExplain(BASE_RECYCLING_RUB, coeff, recycling)}. Возраст: ${AGE_BAND_LABELS[age_band]}. Точный расчёт зависит от мощности модификации.`
+      : `${BASE_RECYCLING_RUB.toLocaleString("ru-RU")} ₽ × ${coeff}${
+          powerInfo.source === "cc"
+            ? " · мощность не указана в объявлении — утиль ориентировочный"
+            : ` · ${powerHp} л.с.${powerInfo.source === "badge" ? " (по комплектации)" : ""}`
         } · ${AGE_BAND_LABELS[age_band]}. Точный расчёт зависит от мощности конкретной модификации.`,
     rates: { ...rates },
     official_rates: { ...official },

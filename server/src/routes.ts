@@ -19,6 +19,7 @@ import {
   adminWarmImages,
 } from "./services/admin.js";
 import { dedupeVisualVehicles } from "./services/dedupeVehicles.js";
+import { getFxPulse } from "./services/fxRates.js";
 
 export const api = Router();
 
@@ -190,6 +191,8 @@ api.get("/meta", (req, res) => {
     .filter((m, i, arr) => arr.findIndex((x) => x.brand === m.brand && x.model === m.model) === i)
     .sort((a, b) => a.brand.localeCompare(b.brand) || a.model.localeCompare(b.model));
 
+  const fx = getFxPulse();
+
   res.json({
     brands,
     models,
@@ -201,7 +204,13 @@ api.get("/meta", (req, res) => {
       EUR: commercialRate("EUR"),
       USD: commercialRate("USD"),
     },
+    fx_fingerprint: fx.fingerprint,
+    fx_updated_at: fx.updated_at,
   });
+});
+
+api.get("/fx/pulse", (_req, res) => {
+  res.json(getFxPulse());
 });
 
 const leadSchema = z.object({
@@ -416,7 +425,7 @@ api.get("/admin/fx", requireAdmin, (_req, res) => {
   res.json({ items: loadStore().fx_rates });
 });
 
-api.patch("/admin/fx", requireAdmin, (req, res) => {
+api.patch("/admin/fx", requireAdmin, async (req, res) => {
   const items = Array.isArray(req.body?.items) ? req.body.items : [];
   const store = loadStore();
   for (const row of items) {
@@ -439,13 +448,23 @@ api.patch("/admin/fx", requireAdmin, (req, res) => {
     }
   }
   saveStore(store);
+  try {
+    const { repriceAllVehicles } = await import("./services/reprice.js");
+    repriceAllVehicles();
+    const { exportStaticCatalog } = await import("./export-static.js");
+    exportStaticCatalog();
+    const { noteFxStoreChanged } = await import("./services/fxRates.js");
+    noteFxStoreChanged();
+  } catch (e) {
+    console.error("[fx] admin patch reprice failed", e);
+  }
   res.json({ ok: true, items: store.fx_rates });
 });
 
 api.post("/admin/fx/refresh", requireAdmin, async (_req, res) => {
   try {
-    const { refreshOfficialFxRates } = await import("./services/fxRates.js");
-    const result = await refreshOfficialFxRates();
+    const { refreshFxAndRepriceIfNeeded } = await import("./services/fxRates.js");
+    const result = await refreshFxAndRepriceIfNeeded();
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: String(e) });

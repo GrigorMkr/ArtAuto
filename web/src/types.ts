@@ -68,6 +68,14 @@ export type MetaResponse = {
   brands: string[];
   models: Array<{ brand: string; model: string }>;
   commercial: Record<string, number>;
+  fx_fingerprint?: string;
+  fx_updated_at?: string;
+  rates?: Array<{
+    code: string;
+    official_rate_rub: number;
+    commercial_markup_pct: number;
+    manual_commercial_rate_rub: number | null;
+  }>;
 };
 
 export type DealEvent = { at: string; status: string; title: string; text: string };

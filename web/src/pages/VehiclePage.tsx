@@ -7,8 +7,8 @@ import { Reveal } from "../components/Motion";
 import { DetailGallery } from "../components/DetailGallery";
 import { PriceBreakdown } from "../components/PriceBreakdown";
 import { VehicleHeroPanel } from "../components/vehicle/VehicleHeroPanel";
-import { VehicleSpecsPanel } from "../components/vehicle/VehicleSpecsPanel";
-import { buildVehicleFacts } from "../lib/vehicleFacts";
+import { VehicleTrimSpecs, parseTrimSpecs } from "../components/vehicle/VehicleTrimSpecs";
+import { buildTrimGroupsFallback, scrubTrimGroups } from "../lib/trimSpecs";
 import { useAuth } from "../auth";
 
 export function VehiclePage() {
@@ -24,7 +24,12 @@ export function VehiclePage() {
     setActive(0);
   }, [vehicle?.public_slug]);
 
-  const facts = useMemo(() => (vehicle ? buildVehicleFacts(vehicle) : []), [vehicle]);
+  const trimGroups = useMemo(() => {
+    if (!vehicle) return [];
+    const fromServer = parseTrimSpecs(vehicle.specifications?.trim_specs_json);
+    const base = fromServer.length ? fromServer : buildTrimGroupsFallback(vehicle);
+    return scrubTrimGroups(base, vehicle);
+  }, [vehicle]);
 
   const onAddDeal = useCallback(async () => {
     if (!vehicle) return;
@@ -62,15 +67,18 @@ export function VehiclePage() {
       </Reveal>
 
       <Reveal delay={0.06}>
-        <article className="detail">
-          <DetailGallery
-            photos={photos}
-            alt={`${vehicle.brand} ${vehicle.model}`}
-            active={active}
-            onChange={setActive}
-          />
+        <article className="detail detail--rich">
+          <div className="detail-media">
+            <DetailGallery
+              photos={photos}
+              alt={`${vehicle.brand} ${vehicle.model}`}
+              active={active}
+              onChange={setActive}
+            />
+            <VehicleTrimSpecs groups={trimGroups} />
+          </div>
 
-          <div className="detail-info">
+          <aside className="detail-info">
             <VehicleHeroPanel
               vehicle={vehicle}
               user={user}
@@ -78,13 +86,12 @@ export function VehiclePage() {
               dealMsg={dealMsg}
               onAddDeal={onAddDeal}
             />
-            <VehicleSpecsPanel facts={facts} />
             <PriceBreakdown
               specs={vehicle.specifications || {}}
               totalRub={vehicle.estimated_total_rub}
             />
             <LeadForm vehicleSlug={vehicle.public_slug} />
-          </div>
+          </aside>
         </article>
       </Reveal>
     </>

@@ -35,6 +35,9 @@ const FUEL_MAP: Record<string, string> = {
   가솔린전기: "гибрид",
   하이브리드: "гибрид",
   "가솔린+전기": "гибрид",
+  디젤전기: "гибрид (дизель)",
+  "디젤+전기": "гибрид (дизель)",
+  수소: "водород",
 };
 
 export type EncarOffer = {
@@ -523,12 +526,13 @@ export async function fetchEncarBatch(total = 1200): Promise<NormalizedImport[]>
     await new Promise((r) => setTimeout(r, 80));
   }
 
-  // Enrich galleries from detail photos API (list often returns only ~4);
-  // also drop any OPERATING_LEASE that slipped past SellType.
+  // Enrich galleries + SPEC/CATEGORY from detail (cc, fuel, yearMonth, gearbox…).
+  // Encar SPEC has no HP — power comes from trim badges later.
   const concurrency = 8;
   let multi = 0;
+  let withCc = 0;
   const dropLease = new Set<string>();
-  console.log(`[encar] enriching galleries for ${out.length} cars (x${concurrency})…`);
+  console.log(`[encar] enriching detail for ${out.length} cars (x${concurrency})…`);
   for (let i = 0; i < out.length; i += concurrency) {
     const chunk = out.slice(i, i + concurrency);
     await Promise.all(
@@ -539,19 +543,41 @@ export async function fetchEncarBatch(total = 1200): Promise<NormalizedImport[]>
             dropLease.add(row.source_listing_id);
             return;
           }
-          const gallery = detail?.images || [];
+          if (!detail) return;
+          const gallery = detail.images || [];
           if (gallery.length > row.images.length) {
             const merged = [...gallery, ...row.images].filter(Boolean);
             row.images = [...new Set(merged)].slice(0, 16);
           }
           if (row.images.length > 1) multi += 1;
+          if (detail.brand) row.brand = detail.brand;
+          if (detail.model && detail.model !== "Model") row.model = detail.model;
+          if (detail.trim) row.trim = detail.trim;
+          if (detail.year) row.year = detail.year;
+          if (detail.year_month) row.year_month = detail.year_month;
+          if (detail.mileage_km != null) row.mileage_km = detail.mileage_km;
+          if (detail.fuel_type) row.fuel_type = detail.fuel_type;
+          if (detail.transmission) row.transmission = detail.transmission;
+          if (detail.drive) row.drive = detail.drive;
+          if (detail.body_type) row.body_type = detail.body_type;
+          if (detail.engine_cc) {
+            row.engine_cc = detail.engine_cc;
+            withCc += 1;
+          }
+          if (detail.color) row.color = detail.color;
+          if (detail.seats) row.seats = detail.seats;
+          if (detail.foreign_price != null && !row.foreign_price) {
+            row.foreign_price = detail.foreign_price;
+          }
         } catch {
           /* keep list photos */
         }
       })
     );
     if ((i / concurrency) % 15 === 0) {
-      console.log(`[encar] gallery progress ${Math.min(i + concurrency, out.length)}/${out.length}`);
+      console.log(
+        `[encar] detail progress ${Math.min(i + concurrency, out.length)}/${out.length} cc=${withCc}`
+      );
     }
     if (i + concurrency < out.length) await new Promise((r) => setTimeout(r, 60));
   }
@@ -560,7 +586,7 @@ export async function fetchEncarBatch(total = 1200): Promise<NormalizedImport[]>
     ? out.filter((r) => !dropLease.has(r.source_listing_id))
     : out;
   console.log(
-    `[encar] fetched ${filtered.length}, multi-photo=${multi}, dropped_lease=${dropLease.size}`
+    `[encar] fetched ${filtered.length}, multi-photo=${multi}, with_cc=${withCc}, dropped_lease=${dropLease.size}`
   );
   return filtered;
 }

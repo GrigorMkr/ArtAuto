@@ -1,12 +1,17 @@
 import { loadStore, saveStore, type Vehicle } from "../db.js";
 import { createPricingContext, estimateVehicleTotal } from "../estimate.js";
-import { estimatePowerHp, hpToKw, resolveEngineCc } from "./powerEstimate.js";
+import { estimatePowerHp, hpToKw, resolveEngineCc, isTrustedPowerSource } from "./powerEstimate.js";
 import { fetchEncarBatch, type NormalizedImport as EncarNorm } from "./sources/encarPublic.js";
 import {
   fetchDongchediBatch,
   type NormalizedImport as DcdNorm,
 } from "./sources/dongchediPublic.js";
 import { fetchChe168Batch, type NormalizedImport as CheNorm } from "./sources/che168Public.js";
+import {
+  buildTrimGroupsFromVehicle,
+  serializeTrimSpecs,
+  type TrimSpecGroup,
+} from "./trimSpecs.js";
 
 type NormalizedImport = EncarNorm | DcdNorm | CheNorm;
 
@@ -28,6 +33,9 @@ function upsertNormalized(
     ("year_month" in nv && nv.year_month) ||
     existing?.specifications?.year_month ||
     null;
+  const seats =
+    ("seats" in nv && nv.seats) ||
+    (existing?.specifications?.seats != null ? Number(existing.specifications.seats) : null);
   const power = estimatePowerHp({
     power_hp: nv.power_hp,
     engine_cc: nv.engine_cc,
@@ -41,8 +49,14 @@ function upsertNormalized(
     trim: nv.trim,
     model: nv.model,
     brand: nv.brand,
+    fuel_type: nv.fuel_type,
   });
-  const powerHp = nv.power_hp ?? power.hp;
+  const isEv =
+    /электро/i.test(nv.fuel_type || "") &&
+    !/гибрид|бензин|дизель/i.test(nv.fuel_type || "");
+  const storedCc = isEv ? null : nv.engine_cc != null && nv.engine_cc > 200 ? nv.engine_cc : null;
+  const powerHpForPricing = power.hp;
+  const displayHp = isTrustedPowerSource(power.source) ? power.hp : null;
   const priced =
     nv.foreign_price != null
       ? estimateVehicleTotal(
@@ -50,9 +64,9 @@ function upsertNormalized(
             country: nv.country,
             year,
             year_month: yearMonth,
-            engine_cc: engineCc,
-            power_hp: powerHp,
-            fuel_type: nv.fuel_type || "бензин",
+            engine_cc: isEv ? 0 : engineCc,
+            power_hp: powerHpForPricing,
+            fuel_type: nv.fuel_type || "",
             foreign_price: nv.foreign_price,
             foreign_currency: nv.foreign_currency,
             brand: nv.brand,
@@ -62,6 +76,27 @@ function upsertNormalized(
           pricingCtx
         )
       : null;
+
+  const incomingTrim: TrimSpecGroup[] | undefined =
+    "trim_specs" in nv && Array.isArray(nv.trim_specs) && nv.trim_specs.length
+      ? nv.trim_specs
+      : undefined;
+  const trimGroups =
+    incomingTrim ||
+    buildTrimGroupsFromVehicle({
+      brand: nv.brand,
+      model: nv.model,
+      year: nv.year,
+      body_type: nv.body_type,
+      engine_cc: storedCc,
+      power_hp: displayHp,
+      fuel_type: nv.fuel_type,
+      transmission: nv.transmission,
+      drive: nv.drive,
+      trim: nv.trim,
+      seats: seats && seats > 0 ? seats : null,
+      color: nv.color,
+    });
 
   const payload: Vehicle = {
     id: existing?.id ?? store.seq.vehicle++,
@@ -81,9 +116,9 @@ function upsertNormalized(
     transmission: nv.transmission,
     drive: nv.drive,
     body_type: nv.body_type,
-    engine_cc: nv.engine_cc ?? engineCc,
-    power_hp: powerHp,
-    power_kw: hpToKw(powerHp),
+    engine_cc: storedCc,
+    power_hp: displayHp,
+    power_kw: displayHp != null ? hpToKw(displayHp) : null,
     color: nv.color,
     foreign_price: nv.foreign_price,
     foreign_currency: nv.foreign_currency,
@@ -98,10 +133,16 @@ function upsertNormalized(
           age_years: priced.age_years,
           power_hp_used: priced.power_hp_used,
           power_source: power.source,
-          power_estimated: power.estimated ? 1 : 0,
+          power_estimated: power.source === "cc" ? 1 : 0,
           ...(yearMonth ? { year_month: String(yearMonth) } : {}),
+          ...(seats && seats > 0 ? { seats } : {}),
+          ...(trimGroups.length ? { trim_specs_json: serializeTrimSpecs(trimGroups) } : {}),
         }
-      : existing?.specifications ?? {},
+      : {
+          ...(existing?.specifications ?? {}),
+          ...(seats && seats > 0 ? { seats } : {}),
+          ...(trimGroups.length ? { trim_specs_json: serializeTrimSpecs(trimGroups) } : {}),
+        },
     images: nv.images.length ? nv.images : existing?.images || [],
   };
 

@@ -25,7 +25,7 @@ export const BREAKDOWN_LABELS: Record<string, string> = {
   freight_rub: "Фрахт / морская доставка",
   transport_to_vladivostok_rub: "Фрахт / морская доставка",
   customs_fee_rub: "Таможенный сбор",
-  customs_duty_rub: "Таможенная пошлина (единый платёж)",
+  customs_duty_rub: "Таможенная пошлина",
   customs_total_rub: "Таможенные платежи",
   excise_rub: "Акциз",
   vat_rub: "НДС",

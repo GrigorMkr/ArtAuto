@@ -11,7 +11,10 @@
     "import:encar": "tsx src/import-encar.ts",
     "import:china": "tsx src/import-china.ts",
     "import:sync": "tsx src/import-sync.ts",
-    "export:static": "tsx src/export-static.ts"
+    "export:static": "tsx src/export-static.ts",
+    "enrich:dongchedi": "tsx src/enrich-dongchedi-detail.ts",
+    "enrich:encar": "tsx src/enrich-encar-detail.ts",
+    "enrich:encar-trim": "tsx src/enrich-encar-trim.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

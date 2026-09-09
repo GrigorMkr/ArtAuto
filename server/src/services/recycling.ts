@@ -7,9 +7,9 @@ export const PREFERENTIAL_POWER_KW = 117.68;
 export const BASE_RECYCLING_RUB = 20000;
 
 export function recyclingAgeGroup(ageYears: number) {
-  if (ageYears < 3) return "under_3";
-  if (ageYears < 5) return "from_3_to_5";
-  if (ageYears < 7) return "from_5_to_7";
+  if (ageYears <= 3) return "under_3";
+  if (ageYears <= 5) return "from_3_to_5";
+  if (ageYears <= 7) return "from_5_to_7";
   return "over_7";
 }
 
@@ -102,25 +102,39 @@ export function calculateRecyclingFee(params: {
   personalUse?: boolean;
 }) {
   const under3 = isUnder3(params.ageGroup);
-  const engineCc = Math.max(params.engineCc || 1500, 1);
+  const engineCc = Math.max(params.engineCc || 0, 0);
   const powerKw = Math.max(params.powerKw || 0, 0);
 
-  // EV / sequential hybrid: keep preferential if ≤80 hp (~58.84 kW), else use mid ICE-like band note via high coeffs
   const isEv = params.fuelType === "electric";
   if (isEv) {
+    // Unknown power must NOT get льгота (0 kW would look like ≤80 hp).
+    if (powerKw <= 0) {
+      return Math.round(BASE_RECYCLING_RUB * (under3 ? 129.96 : 176.16));
+    }
+    // Personal EV: льготный только ≤80 л.с. (~58.84 kW); иначе коммерческая лестница.
     if (powerKw <= 58.84) {
       return under3 ? 3400 : 5200;
     }
-    // approximate EV commercial ladder (01.01.2026 personal section 3) — mid band
     const evUnder = powerKw <= 117.68 ? 78 : powerKw <= 183.88 ? 129.96 : 182.4;
     const evOver = powerKw <= 117.68 ? 111.36 : powerKw <= 183.88 ? 176.16 : 239.04;
     return Math.round(BASE_RECYCLING_RUB * (under3 ? evUnder : evOver));
   }
 
-  const coeff = pickCoefficient(engineCc, powerKw, under3);
-  if (coeff <= 1) {
+  const ccForTable = Math.max(engineCc || 1500, 1);
+  // Льготный утиль: одновременно известная мощность ≤160 л.с. и ≤3000 см³.
+  if (powerKw > 0 && powerKw <= PREFERENTIAL_POWER_KW && ccForTable <= 3000) {
     return under3 ? 3400 : 5200;
   }
+
+  // Нет мощности или >3.0 L / >160 л.с. — коммерческая таблица.
+  const kwForTable =
+    powerKw <= 0
+      ? 150 // ориентир ~204 л.с. mid band if completely unknown
+      : powerKw <= PREFERENTIAL_POWER_KW
+        ? PREFERENTIAL_POWER_KW + 0.01
+        : powerKw;
+
+  const coeff = pickCoefficient(ccForTable, kwForTable, under3);
   return Math.round(BASE_RECYCLING_RUB * coeff);
 }
 

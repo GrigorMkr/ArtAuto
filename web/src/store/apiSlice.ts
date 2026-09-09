@@ -50,7 +50,7 @@ function asCatalog(response: unknown, arg: CatalogFilters | void): CatalogRespon
 export const artautoApi = createApi({
   reducerPath: "artautoApi",
   baseQuery: liveBaseQuery,
-  refetchOnMountOrArgChange: 120,
+  refetchOnMountOrArgChange: 60,
   tagTypes: ["Catalog", "Vehicle", "Meta", "Deals"],
   endpoints: (builder) => ({
     getCatalog: builder.query<CatalogResponse, CatalogFilters | void>({
@@ -79,7 +79,7 @@ export const artautoApi = createApi({
         }
       },
       providesTags: ["Catalog"],
-      keepUnusedDataFor: 300,
+      keepUnusedDataFor: 60,
     }),
     getVehicle: builder.query<Vehicle, string>({
       async queryFn(slug) {
@@ -101,6 +101,7 @@ export const artautoApi = createApi({
         }
       },
       providesTags: (_r, _e, slug) => [{ type: "Vehicle", id: slug }],
+      keepUnusedDataFor: 60,
     }),
     getMeta: builder.query<MetaResponse, { country?: string } | void>({
       async queryFn(arg) {
@@ -122,7 +123,7 @@ export const artautoApi = createApi({
         }
       },
       providesTags: ["Meta"],
-      keepUnusedDataFor: 600,
+      keepUnusedDataFor: 60,
     }),
     createLead: builder.mutation<{ id: number; status: string }, Record<string, unknown>>({
       query: (body) => ({ url: "/leads", method: "POST", body }),

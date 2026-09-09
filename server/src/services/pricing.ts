@@ -97,12 +97,13 @@ export function round(n: number) {
 }
 
 export const DEFAULT_SETTINGS: Record<string, { value: number; currency: string; description: string }> = {
-  CN_FOREIGN_EXPENSES_CNY: { value: 16000, currency: "CNY", description: "Расходы в Китае" },
-  CN_TRANSFER_FEE_RUB: { value: 25000, currency: "RUB", description: "Комиссия за перевод (CN)" },
-  CN_PORT_DELIVERY_RUB: { value: 15000, currency: "RUB", description: "Доставка до порта (CN)" },
+  // Silver: ¥ расходы уже включают банк/доки/доставку в порт; отдельно transfer/port/lab = 0.
+  CN_FOREIGN_EXPENSES_CNY: { value: 16000, currency: "CNY", description: "Расходы в Китае (банк/доки/порт)" },
+  CN_TRANSFER_FEE_RUB: { value: 0, currency: "RUB", description: "Комиссия за перевод (CN, в расходах ¥)" },
+  CN_PORT_DELIVERY_RUB: { value: 0, currency: "RUB", description: "Доставка до порта (CN, в расходах ¥)" },
   CN_FREIGHT_RUB: { value: 15000, currency: "RUB", description: "Фрахт / до Владивостока (CN)" },
-  CN_BROKER_RUB: { value: 70000, currency: "RUB", description: "Брокер (CN)" },
-  CN_LABORATORY_RUB: { value: 45000, currency: "RUB", description: "СБКТС / ЭПТС / лаборатория (CN)" },
+  CN_BROKER_RUB: { value: 70000, currency: "RUB", description: "Брокер (CN, вкл. СБКТС/ЭПТС)" },
+  CN_LABORATORY_RUB: { value: 0, currency: "RUB", description: "СБКТС / ЭПТС (CN, в брокере)" },
   CN_COMPANY_FEE_RUB: { value: 50000, currency: "RUB", description: "Услуги АртАвто (CN)" },
   // ₩500 000 у Silver уже включает комиссии/банк/доставку в порт — отдельные строки = 0.
   KR_FOREIGN_EXPENSES_KRW: { value: 500000, currency: "KRW", description: "Расходы в Корее" },

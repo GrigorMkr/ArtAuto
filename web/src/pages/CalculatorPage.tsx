@@ -28,7 +28,7 @@ export function CalculatorPage() {
           foreign_currency: country === "CN" ? "CNY" : "KRW",
           year,
           year_month,
-          engine_cc: Number(fd.get("engine_cc")),
+          engine_cc: Number(fd.get("engine_cc") || 0),
           power_hp: Number(fd.get("power_hp") || 150),
           fuel_type: String(fd.get("fuel_type") || "бензин"),
           delivery_city_rub: Number(fd.get("delivery_city_rub") || 190000),
@@ -45,23 +45,37 @@ export function CalculatorPage() {
     <>
       <Helmet>
         <title>Калькулятор — АртАвто</title>
+        <meta
+          name="description"
+          content="Бесплатный расчёт стоимости авто из Кореи и Китая под ключ: таможня, утиль, логистика."
+        />
       </Helmet>
 
       <Reveal>
-        <section className="page-intro">
-          <p className="eyebrow">Калькулятор</p>
-          <h1>Бесплатный расчёт под ключ</h1>
-          <p className="lede">
-            Возраст считается автоматически по году и месяцу — как на TKS: до 3 / 3–5 / 5–7 /
-            старше 7 лет. Утильсбор зависит от мощности (л.с.).
-          </p>
-        </section>
+        <header className="page-hero page-hero--compact">
+          <div className="page-hero__copy">
+            <p className="eyebrow">Калькулятор</p>
+            <h1>Расчёт под ключ</h1>
+            <p className="page-hero__lede">
+              Возраст — по году и месяцу, как на TKS: до 3 / 3–5 / 5–7 / старше 7 лет. Пошлина и утиль зависят от
+              топлива, объёма и мощности.
+            </p>
+          </div>
+          <aside className="page-hero__aside page-hero__aside--slim" aria-hidden>
+            <p className="page-hero__aside-label">Учитываем</p>
+            <ul className="page-hero__aside-list">
+              <li>Бензин · дизель · гибрид · электро</li>
+              <li>Таможня и утильсбор</li>
+              <li>Логистика и услуги</li>
+            </ul>
+          </aside>
+        </header>
       </Reveal>
 
-      <Reveal delay={0.1}>
-        <div className="calc-layout">
+      <Reveal delay={0.08}>
+        <div className="calc-stage">
           <CalculatorForm error={error} isLoading={isLoading} onSubmit={onSubmit} />
-          <div className="calc-result">
+          <div className={`calc-result-panel${result ? " is-ready" : ""}`}>
             <CalculatorResult result={result} />
           </div>
         </div>

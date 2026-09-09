@@ -9,6 +9,7 @@ import { useAuth } from "../auth";
 import { artautoApi } from "../store/apiSlice";
 import type { AppDispatch } from "../store/store";
 import { PHONE_LABEL, PHONE_TEL, TELEGRAM_URL } from "../contacts";
+import { FxPulseWatcher } from "./FxPulseWatcher";
 
 export { PHONE_TEL, PHONE_LABEL, TELEGRAM_URL };
 
@@ -40,6 +41,7 @@ export function Layout() {
 
   return (
     <div className={classNames("app-shell", { "app-shell--home": isHome })}>
+      <FxPulseWatcher />
       <BrandLoader />
       <div className="site-atmosphere" aria-hidden />
       <SiteHeader

@@ -55,47 +55,59 @@ function slim(v: Vehicle) {
   };
 }
 
-const store = loadStore();
-const vehicles = dedupeVisualVehicles(
-  store.vehicles
-    .filter(isOkBrand)
-    .sort((a, b) => {
-      const score = (v: Vehicle) =>
-        (v.source === "encar" ? 4 : 0) + (v.images?.length ? 2 : 0);
-      return score(b) - score(a) || b.id - a.id;
-    })
-).map(slim);
+export function exportStaticCatalog() {
+  const store = loadStore();
+  const vehicles = dedupeVisualVehicles(
+    store.vehicles
+      .filter(isOkBrand)
+      .sort((a, b) => {
+        const score = (v: Vehicle) =>
+          (v.source === "encar" ? 4 : 0) + (v.images?.length ? 2 : 0);
+        return score(b) - score(a) || b.id - a.id;
+      })
+  ).map(slim);
 
-const brands = [...new Set(vehicles.map((v) => v.brand).filter(Boolean))].sort((a, b) =>
-  a.localeCompare(b, "en")
-);
-const models = vehicles
-  .map((v) => ({ brand: v.brand, model: v.model }))
-  .filter((m, i, arr) => arr.findIndex((x) => x.brand === m.brand && x.model === m.model) === i)
-  .sort((a, b) => a.brand.localeCompare(b.brand) || a.model.localeCompare(b.model));
+  const brands = [...new Set(vehicles.map((v) => v.brand).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, "en")
+  );
+  const models = vehicles
+    .map((v) => ({ brand: v.brand, model: v.model }))
+    .filter((m, i, arr) => arr.findIndex((x) => x.brand === m.brand && x.model === m.model) === i)
+    .sort((a, b) => a.brand.localeCompare(b.brand) || a.model.localeCompare(b.model));
 
-const commercial = {
-  CNY: 12.2,
-  KRW: 0.065,
-  EUR: 100,
-  USD: 100,
-};
-for (const row of store.fx_rates || []) {
-  const rate = row.manual_commercial_rate_rub
-    ? row.manual_commercial_rate_rub
-    : row.official_rate_rub * (1 + (row.commercial_markup_pct || 0) / 100);
-  if (row.code in commercial) (commercial as Record<string, number>)[row.code] = rate;
+  const commercial: Record<string, number> = {
+    CNY: 12.2,
+    KRW: 0.065,
+    EUR: 100,
+    USD: 100,
+  };
+  for (const row of store.fx_rates || []) {
+    const rate = row.manual_commercial_rate_rub
+      ? row.manual_commercial_rate_rub
+      : row.official_rate_rub * (1 + (row.commercial_markup_pct || 0) / 100);
+    if (row.code in commercial) commercial[row.code] = rate;
+  }
+
+  const payload = {
+    generatedAt: new Date().toISOString(),
+    total: vehicles.length,
+    vehicles,
+    brands,
+    models,
+    commercial,
+  };
+
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, JSON.stringify(payload));
+  console.log(
+    `Wrote ${vehicles.length} vehicles → ${outPath} (${Math.round(fs.statSync(outPath).size / 1024)} KB)`
+  );
+  return { total: vehicles.length, outPath };
 }
 
-const payload = {
-  generatedAt: new Date().toISOString(),
-  total: vehicles.length,
-  vehicles,
-  brands,
-  models,
-  commercial,
-};
-
-fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(payload));
-console.log(`Wrote ${vehicles.length} vehicles → ${outPath} (${Math.round(fs.statSync(outPath).size / 1024)} KB)`);
+const isMain =
+  Boolean(process.argv[1]) &&
+  import.meta.url === `file:///${path.resolve(process.argv[1]).replace(/\\/g, "/")}`;
+if (isMain || process.argv[1]?.endsWith("export-static.ts") || process.argv[1]?.endsWith("export-static.js")) {
+  exportStaticCatalog();
+}

@@ -1,6 +1,7 @@
 import { Helmet } from "react-helmet-async";
 import { LeadForm } from "../components/LeadForm";
 import { Reveal } from "../components/Motion";
+import { TelegramIcon } from "../components/BrandIcons";
 import { PHONE_LABEL, PHONE_TEL, TELEGRAM_URL, TELEGRAM_USER } from "../contacts";
 
 export function ContactsPage() {
@@ -8,44 +9,72 @@ export function ContactsPage() {
     <>
       <Helmet>
         <title>Контакты — АртАвто</title>
+        <meta
+          name="description"
+          content="Связаться с АртАвто: телефон, Telegram, заявка на подбор авто из Кореи и Китая."
+        />
       </Helmet>
 
       <Reveal>
-        <section className="page-intro">
-          <p className="eyebrow">Контакты</p>
-          <h1>Связаться с АртАвто</h1>
-          <p className="lede">Подберём авто и сделаем бесплатный предварительный расчёт.</p>
-        </section>
+        <header className="page-hero page-hero--compact">
+          <div className="page-hero__copy">
+            <p className="eyebrow">Контакты</p>
+            <h1>Связаться с АртАвто</h1>
+            <p className="page-hero__lede">
+              Подберём автомобиль и сделаем бесплатный предварительный расчёт — по телефону, в Telegram или по
+              заявке.
+            </p>
+          </div>
+        </header>
       </Reveal>
 
-      <Reveal delay={0.1}>
-        <div className="contacts-layout">
-          <div className="contacts-card">
-            <h2>Офис и связь</h2>
-            <p>г. Уфа</p>
-            <p>
-              Телефон:{" "}
-              <a href={`tel:${PHONE_TEL}`} className="contacts-phone">
+      <Reveal delay={0.08}>
+        <div className="contacts-stage">
+          <div className="contacts-stack">
+            <article className="contact-tile contact-tile--accent">
+              <p className="contact-tile__label">Город</p>
+              <h2>Уфа</h2>
+              <p className="contact-tile__text">
+                Консультации и договор — в том числе дистанционно. Доставка автомобилей по всей России.
+              </p>
+            </article>
+
+            <article className="contact-tile">
+              <p className="contact-tile__label">Телефон</p>
+              <a className="contact-tile__link" href={`tel:${PHONE_TEL}`}>
                 {PHONE_LABEL}
               </a>
-            </p>
-            <p>
-              Telegram:{" "}
-              <a href={TELEGRAM_URL} target="_blank" rel="noreferrer">
-                @{TELEGRAM_USER}
-              </a>
-            </p>
-            <div className="contacts-cta">
-              <a className="btn btn-telegram" href={TELEGRAM_URL} target="_blank" rel="noreferrer">
-                Написать в Telegram
-              </a>
+              <p className="contact-tile__text">Ежедневно. Удобнее всего — короткий звонок или сообщение.</p>
               <a className="btn btn-primary" href={`tel:${PHONE_TEL}`}>
                 Позвонить
               </a>
-            </div>
-            <p className="muted">Работаем ежедневно, консультации и договор — в том числе дистанционно.</p>
+            </article>
+
+            <article className="contact-tile">
+              <p className="contact-tile__label">Telegram</p>
+              <a
+                className="contact-tile__link contact-tile__link--row"
+                href={TELEGRAM_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <TelegramIcon className="contact-tile__icon" />
+                @{TELEGRAM_USER}
+              </a>
+              <p className="contact-tile__text">Фото, видео и сметы по лотам — прямо в чате.</p>
+              <a className="btn btn-telegram" href={TELEGRAM_URL} target="_blank" rel="noreferrer">
+                <TelegramIcon className="btn__icon" />
+                Написать
+              </a>
+            </article>
           </div>
-          <LeadForm title="Оставить заявку" />
+
+          <div className="contacts-form-panel">
+            <LeadForm title="Оставить заявку" />
+            <p className="contacts-form-note">
+              Обычно отвечаем в течение рабочего дня. Можно сразу указать бюджет, страну и желаемую модель.
+            </p>
+          </div>
         </div>
       </Reveal>
     </>
