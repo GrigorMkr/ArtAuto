@@ -34,7 +34,7 @@ function serialize(v: Vehicle, opts?: { allImages?: boolean; light?: boolean }) 
     source_url: v.source_url,
     status: v.status,
     brand: names.brand,
-    model: names.model || stripCjk(v.model) || "Model",
+    model: names.model || "Model",
     generation: opts?.light ? "" : stripCjk(v.generation),
     trim: opts?.light ? "" : stripCjk(v.trim),
     year: v.year,

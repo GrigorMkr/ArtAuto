@@ -34,7 +34,7 @@ function slim(v: Vehicle) {
     source_url: v.source_url,
     status: v.status,
     brand: names.brand,
-    model: names.model || stripCjk(v.model) || "Model",
+    model: names.model || "Model",
     generation: stripCjk(v.generation),
     trim: stripCjk(v.trim),
     year: v.year,
